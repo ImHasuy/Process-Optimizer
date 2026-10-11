@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE bpmn:definitions [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:po="http://projectoptimizer.app/schema/bpmn/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:startEvent id="Start" name="&xxe;" />
+  </bpmn:process>
+</bpmn:definitions>

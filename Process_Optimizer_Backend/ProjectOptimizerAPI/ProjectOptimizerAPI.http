@@ -1,0 +1,224 @@
+@ProjectOptimizerAPI_HostAddress = http://localhost:5212
+@projectId = 00000000-0000-0000-0000-000000000000
+@savedScenarioId = 00000000-0000-0000-0000-000000000000
+@unknownId = 11111111-1111-1111-1111-111111111111
+
+# Seeded projects: "Web shop launch" (revision 2 = worked example) and "Sample project".
+# Copy the id of "Web shop launch" from "List projects" into @projectId.
+
+### Health
+GET {{ProjectOptimizerAPI_HostAddress}}/api/health
+
+### List projects (search, sort, paging)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects?search=web&sortBy=Name&sortDirection=Asc&page=1&pageSize=20
+
+### List projects with an invalid page size (400)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects?pageSize=500
+
+### Create project
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects
+Content-Type: application/json
+
+{
+  "name": "Office move",
+  "description": "Moving to the new office.",
+  "timeUnit": "Days",
+  "currency": "EUR"
+}
+
+### Create project with a duplicate name (409)
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects
+Content-Type: application/json
+
+{
+  "name": "Web shop launch"
+}
+
+### Create project without a name (400)
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects
+Content-Type: application/json
+
+{
+  "name": "  "
+}
+
+### Get project
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}
+
+### Get unknown project (404)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{unknownId}}
+
+
+### Update project
+PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}
+Content-Type: application/json
+
+{
+  "name": "Web shop launch 2.0",
+  "description": "Renamed.",
+  "timeUnit": "Days",
+  "currency": "EUR"
+}
+
+### Update project to a name that is taken (409)
+PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}
+Content-Type: application/json
+
+{
+  "name": "Sample project",
+  "timeUnit": "Days",
+  "currency": "EUR"
+}
+
+### Copy project
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/copies
+
+### Copy unknown project (404)
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{unknownId}}/copies
+
+### Delete project
+DELETE {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}
+
+### Delete unknown project (404)
+DELETE {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{unknownId}}
+
+### Get latest diagram
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram
+
+### Get latest diagram of an unknown project (404)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{unknownId}}/diagram
+
+### Save diagram revision
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions
+Content-Type: application/json
+
+{
+  "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" id=\"D\"><bpmn:process id=\"P\"><bpmn:startEvent id=\"S\" /><bpmn:task id=\"T\" name=\"Work\" xmlns:po=\"http://projectoptimizer.app/schema/bpmn/1.0\" po:duration=\"3\" po:cost=\"100\" /><bpmn:endEvent id=\"E\" /><bpmn:sequenceFlow id=\"F1\" sourceRef=\"S\" targetRef=\"T\" /><bpmn:sequenceFlow id=\"F2\" sourceRef=\"T\" targetRef=\"E\" /></bpmn:process></bpmn:definitions>",
+  "baseRevision": 2
+}
+
+### Save diagram revision with an outdated base revision (409)
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions
+Content-Type: application/json
+
+{
+  "bpmnXml": "<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" />",
+  "baseRevision": 1
+}
+
+### Save malformed diagram XML (400)
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions
+Content-Type: application/json
+
+{
+  "bpmnXml": "<not-closed>",
+  "baseRevision": 2
+}
+
+### List revisions
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions
+
+### List revisions of an unknown project (404)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{unknownId}}/diagram/revisions
+
+### Get revision
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions/1
+
+### Get unknown revision (404)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions/999
+
+### Download diagram file
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/file
+
+### Download diagram file of an unknown project (404)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{unknownId}}/diagram/file
+
+### Process graph
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/graph?revision=2
+
+### Process graph for an unknown revision (400)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/graph?revision=999
+
+### Validation report
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/validation
+
+### Validation report for an unknown revision (400)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/validation?revision=999
+
+### Scenario count
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenario-count
+
+### Scenario count of a diagram with errors (409)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenario-count?revision=1
+
+### List scenarios
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios?sortBy=TotalCost&sortDirection=Desc&page=1&pageSize=20
+
+### List scenarios with an invalid page size (400)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios?pageSize=500
+
+### Get scenario
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios/1
+
+### Get scenario beyond the count (404)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios/99
+
+### Resource limits
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/resource-limits?basis=Planned
+
+### Resource limits of a diagram with errors (409)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/resource-limits?revision=1
+
+### Create saved scenario
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios
+Content-Type: application/json
+
+{
+  "scenarioIndex": 1,
+  "name": "Cloud launch",
+  "note": "Faster but more expensive."
+}
+
+### Create saved scenario with an index beyond the count (400)
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios
+Content-Type: application/json
+
+{
+  "scenarioIndex": 99,
+  "name": "Does not exist"
+}
+
+### List saved scenarios
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios
+
+### List saved scenarios of an unknown project (404)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{unknownId}}/saved-scenarios
+
+### Get saved scenario
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{savedScenarioId}}
+
+### Get unknown saved scenario (404)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{unknownId}}
+
+### Update saved scenario
+PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{savedScenarioId}}
+Content-Type: application/json
+
+{
+  "name": "Cloud launch (approved)",
+  "note": null
+}
+
+### Update saved scenario without a name (400)
+PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{savedScenarioId}}
+Content-Type: application/json
+
+{
+  "name": ""
+}
+
+### Delete saved scenario
+DELETE {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{savedScenarioId}}
+
+### Delete unknown saved scenario (404)
+DELETE {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{unknownId}}

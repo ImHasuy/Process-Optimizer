@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:po="http://projectoptimizer.app/schema/bpmn/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:startEvent id="Start" />
+    <bpmn:parallelGateway id="Split" />
+    <bpmn:task id="A" name="A" po:duration="1" po:cost="1" />
+    <bpmn:task id="B" name="B" po:duration="1" po:cost="1" />
+    <bpmn:exclusiveGateway id="Join" />
+    <bpmn:endEvent id="End" />
+    <bpmn:sequenceFlow id="F1" sourceRef="Start" targetRef="Split" />
+    <bpmn:sequenceFlow id="F2" sourceRef="Split" targetRef="A" />
+    <bpmn:sequenceFlow id="F3" sourceRef="Split" targetRef="B" />
+    <bpmn:sequenceFlow id="F4" sourceRef="A" targetRef="Join" />
+    <bpmn:sequenceFlow id="F5" sourceRef="B" targetRef="Join" />
+    <bpmn:sequenceFlow id="F6" sourceRef="Join" targetRef="End" />
+  </bpmn:process>
+</bpmn:definitions>
