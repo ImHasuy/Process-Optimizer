@@ -107,7 +107,6 @@ namespace ProjectOptimizerAPI.Lib.Collection
 
 			services.AddScoped<IProjectService, ProjectService>();
 			services.AddScoped<IDiagramService, DiagramService>();
-			services.AddScoped<IAnalysisService, AnalysisService>();
 			services.AddScoped<IScenarioService, ScenarioService>();
 			services.AddScoped<ISavedScenarioService, SavedScenarioService>();
 			return services;

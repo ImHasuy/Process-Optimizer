@@ -34,7 +34,7 @@ namespace ProjectOptimizerAPI.Lib.Service
 			return scenarioKey => scenarioIndexer.Rank(structure, scenarioKey);
 		}
 
-		public async Task<AnalyzedRevision> AnalyzeRevisionAsync(Guid projectId, int? revisionNumber)
+		private async Task<AnalyzedRevision> AnalyzeRevisionAsync(Guid projectId, int? revisionNumber)
 		{
 			var revision = await revisionResolver.ResolveAsync(projectId, revisionNumber);
 			var analysis = diagramAnalyzer.Analyze(revision.ContentSha256, revision.BpmnXml);

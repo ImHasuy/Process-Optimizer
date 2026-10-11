@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using ProjectOptimizerAPI.Lib.Database;
 using ProjectOptimizerLib.DTO;
 using ProjectOptimizerLib.Enum;
 using ProjectOptimizerTests.Infrastructure;
@@ -17,8 +16,6 @@ namespace ProjectOptimizerTests.Integration.Controller
 
 		private static string ProjectUrl(Guid id) => $"{ProjectsUrl}/{id}";
 
-		private static string CopiesUrl(Guid id) => $"{ProjectUrl(id)}/copies";
-
 		private static object UpdateBody(string name, string? description = null, string? timeUnit = "Days", string? currency = "EUR") =>
 			new { Name = name, Description = description, TimeUnit = timeUnit, Currency = currency };
 
@@ -26,81 +23,16 @@ namespace ProjectOptimizerTests.Integration.Controller
 			(await (await _client.GetAsync(ProjectUrl(id))).ReadApiResponseAsync<ProjectDetailsDTO>()).Data!;
 
 		[Fact]
-		public async Task ListProjects_Default_ReturnsOkEnvelopeWithPagedResult()
-		{
-			var response = await _client.GetAsync(ProjectsUrl);
-
-			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-			var body = await response.ReadApiResponseAsync<PagedResultDTO<ProjectListItemDTO>>();
-			Assert.Equal((int)HttpStatusCode.OK, body.StatusCode);
-			Assert.Equal(1, body.Data!.Page);
-			Assert.Equal(20, body.Data.PageSize);
-			Assert.True(body.Data.TotalCount >= body.Data.Items.Count);
-		}
-
-		[Fact]
-		public async Task ListProjects_SeededDatabase_ContainsWebShopLaunch()
-		{
-			var response = await _client.GetAsync($"{ProjectsUrl}?search=web%20shop%20launch");
-
-			var body = await response.ReadApiResponseAsync<PagedResultDTO<ProjectListItemDTO>>();
-			var item = Assert.Single(body.Data!.Items);
-			Assert.Equal(DatabaseSeeder.WorkedExampleProjectName, item.Name);
-			Assert.Equal(2, item.LatestRevisionNumber);
-			Assert.True(item.IsOptimizable);
-		}
-
-		[Fact]
-		public async Task ListProjects_SearchForCreatedProject_ReturnsOnlyThatProject()
+		public async Task ListProjects_CreatedProject_ReturnsOkEnvelopeContainingIt()
 		{
 			var created = await _client.CreateProjectAsync();
 
-			var response = await _client.GetAsync($"{ProjectsUrl}?search={Uri.EscapeDataString(created.Name.ToLowerInvariant())}&sortBy=Name&sortDirection=Desc&page=1&pageSize=5");
+			var response = await _client.GetAsync(ProjectsUrl);
 
 			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-			var body = await response.ReadApiResponseAsync<PagedResultDTO<ProjectListItemDTO>>();
-			Assert.Equal(created.Id, Assert.Single(body.Data!.Items).Id);
-			Assert.Equal(1, body.Data.TotalCount);
-		}
-
-		[Fact]
-		public async Task ListProjects_PageSizeAboveHundred_ReturnsBadRequest()
-		{
-			var response = await _client.GetAsync($"{ProjectsUrl}?pageSize=101");
-
-			await response.AssertValidationErrorAsync(nameof(ProjectFilterDTO.PageSize));
-		}
-
-		[Fact]
-		public async Task ListProjects_PageZero_ReturnsBadRequest()
-		{
-			var response = await _client.GetAsync($"{ProjectsUrl}?page=0");
-
-			await response.AssertValidationErrorAsync(nameof(ProjectFilterDTO.Page));
-		}
-
-		[Fact]
-		public async Task ListProjects_UnknownSortBy_ReturnsBadRequest()
-		{
-			var response = await _client.GetAsync($"{ProjectsUrl}?sortBy=Owner");
-
-			await response.AssertValidationErrorAsync(nameof(ProjectFilterDTO.SortBy));
-		}
-
-		[Fact]
-		public async Task ListProjects_UnknownSortDirection_ReturnsBadRequest()
-		{
-			var response = await _client.GetAsync($"{ProjectsUrl}?sortDirection=Sideways");
-
-			await response.AssertValidationErrorAsync(nameof(ProjectFilterDTO.SortDirection));
-		}
-
-		[Fact]
-		public async Task ListProjects_SearchTooLong_ReturnsBadRequest()
-		{
-			var response = await _client.GetAsync($"{ProjectsUrl}?search={new string('a', 101)}");
-
-			await response.AssertValidationErrorAsync(nameof(ProjectFilterDTO.Search));
+			var body = await response.ReadApiResponseAsync<List<ProjectListItemDTO>>();
+			Assert.Equal((int)HttpStatusCode.OK, body.StatusCode);
+			Assert.Contains(body.Data!, item => item.Id == created.Id);
 		}
 
 		[Fact]
@@ -296,41 +228,6 @@ namespace ProjectOptimizerTests.Integration.Controller
 		public async Task DeleteProject_UnknownId_ReturnsNotFound()
 		{
 			var response = await _client.DeleteAsync(ProjectUrl(Guid.NewGuid()));
-
-			await response.AssertApiErrorContainingAsync(HttpStatusCode.NotFound, "was not found");
-		}
-
-		[Fact]
-		public async Task CopyProject_Existing_ReturnsCreatedWithCopyName()
-		{
-			var source = await _client.CreateProjectAsync();
-
-			var response = await _client.PostAsync(CopiesUrl(source.Id), null);
-
-			Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-			var copy = (await response.ReadApiResponseAsync<ProjectDetailsDTO>()).Data!;
-			Assert.Equal($"{source.Name} (copy)", copy.Name);
-			Assert.NotEqual(source.Id, copy.Id);
-			Assert.Equal(1, copy.LatestRevision.RevisionNumber);
-			Assert.EndsWith(ProjectUrl(copy.Id), response.Headers.Location!.ToString(), StringComparison.OrdinalIgnoreCase);
-		}
-
-		[Fact]
-		public async Task CopyProject_CopiedTwice_ReturnsNumberedSecondCopy()
-		{
-			var source = await _client.CreateProjectAsync();
-			await _client.PostAsync(CopiesUrl(source.Id), null);
-
-			var response = await _client.PostAsync(CopiesUrl(source.Id), null);
-
-			Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-			Assert.Equal($"{source.Name} (copy) 2", (await response.ReadApiResponseAsync<ProjectDetailsDTO>()).Data!.Name);
-		}
-
-		[Fact]
-		public async Task CopyProject_UnknownId_ReturnsNotFound()
-		{
-			var response = await _client.PostAsync(CopiesUrl(Guid.NewGuid()), null);
 
 			await response.AssertApiErrorContainingAsync(HttpStatusCode.NotFound, "was not found");
 		}

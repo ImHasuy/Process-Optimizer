@@ -5,7 +5,6 @@ namespace ProjectOptimizerAPI.Lib.Interface
 		Task<TEntity?> FindAsync(Guid id);
 		Task<TEntity> GetRequiredAsync(Guid id);
 		Task<bool> ExistsAsync(Guid id);
-		Task<List<TDto>> ListAsync<TDto>();
 		Task<TDto> GetRequiredAsync<TDto>(Guid id);
 		void Add(TEntity entity);
 		void Remove(TEntity entity);

@@ -1,181 +1,181 @@
-# Project Optimizer API — phase 1
+# Project Optimizer API
 
-An ASP.NET Core 8 Web API that stores projects modelled as **BPMN 2.0 diagrams**. Activities carry a duration
-and a cost through `po:` extension attributes, and every save of the diagram becomes a numbered revision. The API
-parses and validates each revision with 17 diagram rules (DV-01 … DV-17). For valid diagrams it enumerates every
-**scenario** (one per combination of exclusive/inclusive gateway choices) and computes each scenario's critical
-path, total duration and total cost. It also reports the cost and duration **resource limits** over all
-scenarios, and stores named snapshots of scenarios.
+An ASP.NET Core 8 Web API that stores process diagrams for projects and analyses them. The frontend draws a BPMN
+diagram, gives tasks a **time** and a **price**, and exports it as JSON (`states` and `branches`). The API turns that
+export into a BPMN 2.0 diagram, checks it, and lists every **scenario**: one per combination of choices at
+exclusive or inclusive gateways. For each scenario it computes the critical path, total duration and total cost.
 
-This repository is **phase 1** of the specification (doc 09 §9.1–9.2). It has no users or authentication, no
-project ownership, no dependency matrix and no optimizer; those are phase 2. Every endpoint is anonymous, so
-**do not expose this build to the internet**.
+There are no users and no authentication, so **do not expose this API to the internet**.
 
-## Features
+## What it does
 
-- **Projects** (FR-10 … FR-16): create, list with search / sort / paging, read, replace settings, delete with
-  cascade, copy (`"<name> (copy)"`, `" (copy) 2"`, …). Names are globally unique, ignoring case and surrounding
-  spaces.
-- **Diagram revisions** (FR-17, FR-20 … FR-24, FR-32):
-  - Save a BPMN XML as a new revision with optimistic concurrency (`baseRevision`).
-  - Or save the frontend's JSON export (`states`, `branches`) through `…/diagram/revisions/json`: it is converted to
-    BPMN XML with a generated layout, and texts such as `15m` or `25 EUR` are converted to the project's unit and currency.
-  - Read the latest revision, list and read revisions, and download a `.bpmn` file.
-  - Each revision stores an issue count summary.
-  - The latest 50 revisions are kept (older ones only if a saved scenario uses them).
-- **Safe XML handling** (BR-08, BR-17, NFR-15): no DTDs, no XXE, at most 2 MB and 1000 flow nodes.
-- **Analysis** (FR-30, FR-31): the parsed process graph and a validation report for any revision, including
-  diagrams with errors.
-- **Scenarios** (FR-42, FR-43, FR-60 … FR-63):
-  - Count the scenarios without building them.
-  - List scenarios with paging and sorting by index, cost or duration.
-  - Fetch one scenario by its canonical index, with its CPM schedule (ES/EF/LS/LF/slack), critical path, path
-    count, total and sequential duration, and total cost.
-- **Resource limits** (FR-70 … FR-72): min/max cost and min/max critical-path duration with the scenarios that
-  reach them, plus max sequential duration, max exclusive duration and the duration bound. Either the planned or
-  the pessimistic estimates can be used.
-- **Saved scenarios** (FR-65): frozen, named snapshots with an availability check against the latest revision.
-- **Uniform JSON envelope** (`ApiResponse`), Swagger UI with XML docs, migrations and seed data applied on startup.
+1. **Projects:** create, list, read, update and delete. A project has a unique name, a time unit (Minutes, Hours,
+   Days, Weeks) and a currency. Deleting a project also deletes its revisions and saved scenarios.
+2. **Diagram revisions:** every save creates a new numbered revision.
+   - Save the frontend's JSON export (`…/diagram/revisions/json`), or a raw BPMN XML (`…/diagram/revisions`).
+   - Each save must send the `baseRevision` it was edited from. If someone else saved in the meantime, the API
+     answers 409.
+   - The latest 50 revisions are kept. Older ones are kept only while a saved scenario uses them.
+   - You can list and read revisions, and download the latest one as a `.bpmn` file.
+3. **Validation (internal, no endpoint):** every save is checked against 17 rules (DV-01 … DV-17) such as "no start
+   event", "unreachable node" or "cycle". Issues never block saving; a revision only carries its `errorCount`,
+   `warningCount` and `isOptimizable`. The scenario endpoints answer 409 for a diagram with errors.
+4. **Scenarios:** the scenario count, a paged list of scenarios, and one scenario in detail. The detail includes the
+   schedule of each activity (earliest/latest start and finish, slack), the critical path, the total duration and
+   the total cost.
+5. **Resource limits:** the minimum and maximum cost and critical-path duration over all scenarios, using either
+   the planned or the pessimistic estimates.
+6. **Saved scenarios:** named, frozen snapshots of a scenario, with a note.
 
-## Tech stack
+## The frontend JSON format
 
-| Component | Version |
-|---|---|
-| .NET / ASP.NET Core | 8.0 (`net8.0`) |
-| EF Core + SQLite | 8.0.31 |
-| Mapster | 10.0.13 |
-| Swashbuckle.AspNetCore | 10.3.0 |
-| xUnit | 2.5.3 |
-| Microsoft.AspNetCore.Mvc.Testing | 8.0.31 |
-| Microsoft.Extensions.TimeProvider.Testing | 10.10.0 |
+`POST /api/projects/{projectId}/diagram/revisions/json` takes the frontend export plus the base revision:
 
-## Prerequisites
+```json
+{
+  "baseRevision": 1,
+  "states": [
+    { "id": "Start", "name": "Start", "type": "bpmn:StartEvent", "time": "", "price": "", "Depends_on": [], "Connects_to": ["Task_1"] },
+    { "id": "Task_1", "name": "Pack", "type": "bpmn:Task", "time": "15m", "price": "25 EUR", "Depends_on": ["Start"], "Connects_to": ["End"] },
+    { "id": "End", "name": "End", "type": "bpmn:EndEvent", "time": "", "price": "", "Depends_on": ["Task_1"], "Connects_to": [] }
+  ],
+  "branches": [
+    { "id": "Flow_1", "name": "", "source": "Start", "target": "Task_1", "type": "sequence", "condition": null },
+    { "id": "Flow_2", "name": "", "source": "Task_1", "target": "End", "type": "sequence", "condition": null }
+  ]
+}
+```
 
-- .NET SDK **8.0** (built and tested with 8.0.425).
-- Nothing else: SQLite is embedded, and `dotnet-ef` is a local tool.
+- `type` of a state is a BPMN element type such as `bpmn:Task`, `bpmn:ExclusiveGateway` or `bpmn:EndEvent`.
+- `time` and `price` are converted to the project's unit and currency. For example, `15m` becomes `0.010417` in a
+  project that counts in Days, and `25 EUR` becomes `25` in a EUR project. A plain number is used as is. A value
+  that cannot be converted (such as `25 USD` in a EUR project) is kept as typed and counted as a DV-09 error.
+- A branch with `type: "nor"` becomes the default flow of its gateway. A state can have at most one.
+- The connections are taken from `branches`. `Depends_on` and `Connects_to` are accepted but ignored (not stored).
+
+The C# classes for this format are in `ProjectOptimizerLib/Model/Process/`: `ProcessDiagram`, `ProcessState`,
+`ProcessBranch` and `ProcessBranchTypes`. Use `ProcessDiagram.Parse(json)` to read an export anywhere in the code,
+and `diagram.ToJson()` to write one.
+
+## Endpoints
+
+All routes start with `/api`. Every JSON response uses the same envelope:
+`{ "statusCode": 200, "message": "Success", "date": "…", "data": … }`. On errors there is no `data`, and validation errors come
+with an `errors` object listing the problems for each field.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/projects` | List all projects, most recently updated first |
+| POST | `/projects` | Create a project (revision 1 holds a default diagram) |
+| GET | `/projects/{id}` | Read a project with its latest revision summary |
+| PUT | `/projects/{id}` | Replace name, description, time unit and currency |
+| DELETE | `/projects/{id}` | Delete a project with everything in it |
+| GET | `/projects/{projectId}/diagram` | Latest revision, including the BPMN XML |
+| POST | `/projects/{projectId}/diagram/revisions/json` | Save the frontend JSON export as a new revision |
+| POST | `/projects/{projectId}/diagram/revisions` | Save a BPMN XML as a new revision |
+| GET | `/projects/{projectId}/diagram/revisions` | List revisions (without XML) |
+| GET | `/projects/{projectId}/diagram/revisions/{revisionNumber}` | Read one revision |
+| GET | `/projects/{projectId}/diagram/file` | Download the latest diagram as `.bpmn` |
+| GET | `/projects/{projectId}/scenario-count?revision=` | Number of scenarios |
+| GET | `/projects/{projectId}/scenarios?revision=&page=&pageSize=` | One page of scenarios (default page 1, size 20, max 100) |
+| GET | `/projects/{projectId}/scenarios/{index}?revision=` | One scenario with its schedule and critical path |
+| GET | `/projects/{projectId}/resource-limits?revision=&basis=` | Cost and duration limits (`Planned` or `Pessimistic`) |
+| POST / GET | `/projects/{projectId}/saved-scenarios` | Save a scenario snapshot / list saved scenarios |
+| GET / PUT / DELETE | `/projects/{projectId}/saved-scenarios/{id}` | Read, rename or delete a saved scenario |
+
+`revision` is optional everywhere; the latest revision is used when it is omitted.
+
+Status codes:
+- **400:** invalid input, or an unknown revision in the query or body.
+- **404:** unknown project, saved scenario or scenario index, or an unknown revision in the route.
+- **409:** a name conflict, a stale `baseRevision`, or a diagram that has errors or too many scenarios.
+
+## Further documentation
+
+- [Docs/EndUser/README.md](Docs/EndUser/README.md): for API consumers. Covers workflows, every endpoint, errors and
+  the data reference.
+- [Docs/Developer/README.md](Docs/Developer/README.md): for maintainers. Covers architecture, services, the analysis
+  engine, the database, testing and how to extend the API.
 
 ## Run it
+
+Prerequisite: the .NET SDK 8.0. SQLite is embedded, and `dotnet-ef` is a local tool.
 
 ```bash
 dotnet tool restore
 dotnet run --project ProjectOptimizerAPI
 ```
 
-The `http` launch profile listens on `http://localhost:5212` and opens **Swagger UI at
-`http://localhost:5212/swagger`** (Development environment). The `https` profile adds `https://localhost:7236`:
+The API listens on `http://localhost:5212`. Swagger UI is at `http://localhost:5212/swagger` in Development.
+`ProjectOptimizerAPI/ProjectOptimizerAPI.http` has a ready-made request for each endpoint, in the order of a typical
+session. In Development, CORS allows the frontend at `http://localhost:5173` (and `http://localhost:3000`); other
+origins go in `Cors:AllowedOrigins` in `appsettings.Development.json`.
 
-```bash
-dotnet run --project ProjectOptimizerAPI --launch-profile https
-```
+## Database
 
-Quick check:
-
-```bash
-curl http://localhost:5212/api/health
-curl "http://localhost:5212/api/projects?search=web"
-```
-
-`ProjectOptimizerAPI/ProjectOptimizerAPI.http` has a ready-made request for every endpoint.
-
-## Database & migrations
-
-- **File.** SQLite, connection string `Data Source=projectoptimizer.db`. With `dotnet run --project
-  ProjectOptimizerAPI` the file is `ProjectOptimizerAPI/projectoptimizer.db`.
-- **Startup.** On startup the API applies the EF Core migrations (`InitialCreate`) and, when the database has no
-  projects, seeds two of them:
-  - **Web shop launch.** Revision 1 is the default diagram. Revision 2 is the specification's worked example: 2
-    scenarios, `G3=E` with 21 days / 23 000 EUR and `G3=F` with 20 days / 25 000 EUR.
-  - **Sample project.** Only the default diagram, which reports DV-03 "no end event", so its scenario endpoints
-    answer 409.
-- **Manual commands.**
+- SQLite file `ProjectOptimizerAPI/projectoptimizer.db`, connection string `DefaultConnection`.
+- Migrations are applied on startup. The database starts empty; there is no seed data.
+- To reset it, stop the API, delete `projectoptimizer.db` (and any `-shm` / `-wal` files), then start it again.
+- To add a migration:
 
   ```bash
-  dotnet tool restore
-  dotnet ef migrations list --project ProjectOptimizerAPI
   dotnet ef migrations add <Name> --project ProjectOptimizerAPI --output-dir Migrations
-  dotnet ef database update --project ProjectOptimizerAPI
   ```
 
-- **Reset the local database.** Stop the API, delete `ProjectOptimizerAPI/projectoptimizer.db` (and any `-shm` /
-  `-wal` files), and start the API again.
-
-## Test accounts
-
-None. Phase 1 has no authentication.
-
-## Running the tests
+## Tests
 
 ```bash
 dotnet test ProjectOptimizer.sln
 ```
 
-There are 570 test methods (921 test cases with theory rows): unit tests for the analysis engine and the
-services, and integration tests over HTTP with `WebApplicationFactory`. All tests use in-memory SQLite. The last
-local run (2026-10-11) reported 921 passed, 0 failed.
+The tests include unit tests for the analysis engine and the services, and integration tests over HTTP with
+`WebApplicationFactory`. All of them use in-memory SQLite.
 
 ## Project structure
 
 ```
-ProjectOptimizer.sln
-ProjectOptimizerAPI/      web project: Controllers/, Lib/{Analysis,Collection,Database,Exceptions,Helper,
-                          Interface,Mapping,Middleware,Repository,Service}/, Migrations/, Program.cs
-ProjectOptimizerLib/      class library: DTO/, Enum/, Model/
-ProjectOptimizerTests/    xUnit: Fixtures/, Infrastructure/, Unit/{Analysis,Service}/, Integration/Controller/
-Docs/EndUser/             guide for API consumers
-Docs/Developer/           guide for maintainers
+ProjectOptimizerAPI/              web project
+  Controllers/                    one controller per resource; thin, they only call a service
+  Lib/Service/                    use cases: projects, diagrams, scenarios, saved scenarios
+  Lib/Analysis/                   the analysis engine (pure, no database)
+    ProcessJsonConverter.cs       frontend JSON  -> BPMN XML (with a generated layout)
+    BpmnGraphParser.cs            BPMN XML       -> ProcessGraph
+    DiagramValidator.cs           ProcessGraph   -> issues (DV-01 … DV-17), used internally
+    ProcessStructureAnalyzer.cs   ProcessGraph   -> tree of split/join fragments (scenario structure)
+    ScenarioIndexer.cs            scenario index <-> gateway choices
+    ScenarioBuilder.cs            choices        -> scenario (with CriticalPathCalculator)
+    ResourceLimitCalculator.cs    min/max cost and duration over all scenarios
+    DiagramAnalyzer.cs            ties the above together and caches results by content hash
+  Lib/Repository/, Lib/Collection/UnitOfWork.cs   database access (EF Core)
+  Lib/Database/                   DbContext, entity configuration, startup migration
+  Lib/Mapping/                    Mapster mappings from entities to DTOs
+  Lib/Middleware/, Lib/Exceptions/  turn exceptions into 400/404/409 responses
+  Lib/Interface/                  interfaces of the services, repositories and analysis components
+  Lib/Helper/                     small utilities (time/price text conversion, hashing, paging, ...)
+  Migrations/                     EF Core migrations
+ProjectOptimizerLib/              shared class library
+  Model/                          database entities: Project, DiagramRevision, SavedScenario
+  Model/Process/                  the frontend JSON format: ProcessDiagram, ProcessState, ProcessBranch
+  DTO/                            request and response shapes
+  Enum/                           enums used by the API
+ProjectOptimizerTests/            xUnit: Unit/, Integration/, Infrastructure/ (test helpers), Fixtures/
 ```
 
-The full tree with a file-by-file table is in [Docs/Developer/project-structure.md](Docs/Developer/project-structure.md).
+### How a request flows
 
-## Design decisions
+`Controller → Service → UnitOfWork / Repository → DbContext`. Scenario endpoints go through `ScenarioCatalog`, which
+loads the revision and asks `DiagramAnalyzer` for the cached analysis of its XML.
 
-| Topic | Decision | Reason |
-|---|---|---|
-| Scope | Phase 1 only; users/auth, ownership, matrix and optimization are not built | Binding user note, spec doc 09 |
-| Authentication | None; all endpoints anonymous | Phase-1 deviation table |
-| Project names | No owner; names unique globally (trimmed, case-insensitive), guard + unique index | BR-04 as changed for phase 1 |
-| Layering | Controller → Service → UnitOfWork → Repository → DbContext; one project guard for all project-scoped calls | Playbook; phase-2 ownership hook (doc 09 §9.4) |
-| Diagram storage | Append-only revisions with the verbatim XML, SHA-256, summary and planned limits | Spec 01 §1.5, 04 §4.2 |
-| Hard vs. soft validation | Only size, node count, malformed XML / DTD and a non-BPMN root are rejected (400); DV issues are reported, never block saving | Spec 01 §1.6–1.8 (BR-09) |
-| Analysis engine | Pure singleton components in `Lib/Analysis`, results cached in `IMemoryCache` by content hash | Spec 04 §4.3, 08 §8.5 |
-| Scenario order | Deterministic canonical index (ordering version 1) over a single-entry single-exit structure tree; keys like `G3=F` | Spec 02 §2.5, 08 §8.3 |
-| Numbers | `decimal`, invariant culture, normalised output | Byte-identical results (NFR-18) |
-| Status codes | Unknown revision in a query/body → 400; in the route → 404; diagram with errors → 409 | BR-19, spec 04 §4.5/§4.7 |
-| Deletes | Hard delete with cascade to revisions and saved scenarios | BR-16, BR-34 |
-| Enums | Strings in JSON and in the database | Readability, VAL-12/14/60 |
-| API docs | Swashbuckle + XML comments, Development only | .NET 8 SDK |
+The diagram is always stored as BPMN XML, even when it arrives as JSON. That way there is only one analysis pipeline,
+and a stored diagram can be opened again in any BPMN editor.
 
-More decisions with their reasons are in [Docs/Developer/architecture.md](Docs/Developer/architecture.md#design-decisions).
+### Design notes
 
-## Documentation
-
-- **[Docs/EndUser/README.md](Docs/EndUser/README.md)** — for API consumers: getting started, workflows, every
-  endpoint, errors, data reference.
-- **[Docs/Developer/README.md](Docs/Developer/README.md)** — for maintainers: architecture, controllers, services,
-  analysis engine, repositories, DTOs and mapping, database, validation rules, testing, configuration, extending.
-
-## Specification coverage
-
-| Spec item | Implemented by |
+| Topic | Decision |
 |---|---|
-| FR-10 … FR-16 projects | `GET/POST /api/projects`, `GET/PUT/DELETE /api/projects/{id}`, `POST /api/projects/{id}/copies`; BR-04, BR-05, BR-15, BR-16, BR-23 |
-| FR-17, FR-20 … FR-24 diagram | `/api/projects/{projectId}/diagram`, `…/diagram/revisions`, `…/diagram/revisions/{revisionNumber}`, `…/diagram/file`; BR-06, BR-07, BR-08, BR-09, BR-17 |
-| FR-30, FR-31 analysis | `GET …/graph`, `GET …/validation`; DV-01 … DV-17, BR-19 |
-| FR-42, FR-43, FR-60 … FR-63 scenarios | `GET …/scenario-count`, `GET …/scenarios`, `GET …/scenarios/{index}`; BR-11, BR-12, BR-30 |
-| FR-65 saved scenarios | `…/saved-scenarios` CRUD; BR-32, BR-33, BR-34 |
-| FR-70 … FR-72 resource limits | `GET …/resource-limits`, stored `maxCost` / `maxDurationBound` per revision |
-| NFR-04 / 05 / 06 / 07 / 08 / 15 / 17 / 18 | health endpoint, Swagger, migrations + seed, CORS, request-size limit, XXE-safe parser, analysis cache, deterministic ordering |
-| Not implemented (phase 2) | FR-01 … FR-05 (users/auth), FR-40 … FR-45 (matrix), FR-50 … FR-55 (optimization), BR-01/02/03/18/20 … 22/24 … 26, the User and OptimizationRun entities |
-| Not implemented (optional) | NFR-19 HTTP caching headers |
-
-The full trace from each requirement to its code and tests is in `.workflow/blueprint.json` (`trace`,
-`notImplemented`). The extracted requirements are in [.workflow/requirements.md](.workflow/requirements.md). The
-workflow's final audit report is `.workflow/REPORT.md`.
-
-## AI usage
-
-The Claude Code `build-dotnet-api` workflow generated this backend, its tests and this documentation from the
-specification. The workflow went through a requirements analysis, an architecture blueprint, parallel
-feature builders and test writers, and review rounds. Its gates checked the result: a build with
-`-warnaserror`, a comment-policy check, the full test suite, a smoke run that fetches the OpenAPI document and the
-Swagger UI, and a documentation coverage check.
+| Storage | Revisions only ever get added; each keeps the exact XML, its SHA-256 hash, the issue counts and the planned cost/duration limits |
+| Validation | Only malformed XML, a DTD, a non-BPMN root, more than 2 MB or more than 1000 nodes are rejected with 400; other issues are only counted on the revision and never block saving |
+| Scenario order | Every scenario has a fixed index and a key such as `G3=F`, so the same diagram always gives the same order |
+| Numbers | `decimal` with invariant culture, so results are reproducible |
+| Enums | Written as strings in JSON and in the database |
+| Caching | Analyses and scenarios are cached in `IMemoryCache` by the diagram's content hash |

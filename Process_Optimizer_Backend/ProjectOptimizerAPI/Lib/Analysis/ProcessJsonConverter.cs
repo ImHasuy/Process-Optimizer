@@ -7,8 +7,8 @@ using ProjectOptimizerAPI.Lib.Analysis.Model;
 using ProjectOptimizerAPI.Lib.Exceptions;
 using ProjectOptimizerAPI.Lib.Helper;
 using ProjectOptimizerAPI.Lib.Interface;
-using ProjectOptimizerLib.DTO;
 using ProjectOptimizerLib.Enum;
+using ProjectOptimizerLib.Model.Process;
 
 namespace ProjectOptimizerAPI.Lib.Analysis
 {
@@ -17,7 +17,6 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 		private const string XmlDeclaration = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
 		private const string TargetNamespace = "http://bpmn.io/schema/bpmn";
 		private const string FormalExpressionType = "bpmn:tFormalExpression";
-		private const string DefaultBranchType = "nor";
 		private const string DiagramElementSuffix = "_di";
 		private const string DefinitionsId = "Definitions_1";
 		private const string ProcessId = "Process_1";
@@ -38,13 +37,15 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 			"Association", "DataInputAssociation", "DataOutputAssociation", "MessageFlow", "SequenceFlow", "Process", "Collaboration"
 		}.ToFrozenSet(StringComparer.Ordinal);
 
-		public string ToBpmnXml(IReadOnlyList<ProcessStateDTO> states, IReadOnlyList<ProcessBranchDTO> branches, ETimeUnit timeUnit, string currency)
+		public string ToBpmnXml(ProcessDiagram diagram, ETimeUnit timeUnit, string currency)
 		{
-			EnsureValidIds(states.Select(state => state.Id).Concat(branches.Select(branch => branch.Id)));
+			var (states, branches) = (diagram.States, diagram.Branches);
+			var ids = states.Select(state => state.Id).Concat(branches.Select(branch => branch.Id)).ToList();
+			EnsureValidIds(ids);
 			EnsureValidTypes(states);
 			var nodes = states.Where(state => !NonFlowTypes.Contains(TypeNameOf(state.Type))).ToList();
 			var defaultFlows = CollectDefaultFlows(branches);
-			var reservedIds = new HashSet<string>(states.Select(state => state.Id).Concat(branches.Select(branch => branch.Id)), StringComparer.Ordinal);
+			var reservedIds = new HashSet<string>(ids, StringComparer.Ordinal);
 			var layout = Arrange(nodes, branches);
 
 			var process = new XElement(ModelNamespace + "process",
@@ -98,7 +99,7 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 			}
 		}
 
-		private static void EnsureValidTypes(IEnumerable<ProcessStateDTO> states)
+		private static void EnsureValidTypes(IEnumerable<ProcessState> states)
 		{
 			var invalid = states.FirstOrDefault(state => !BpmnTypePattern().IsMatch(state.Type));
 			if (invalid is not null)
@@ -107,24 +108,21 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 			}
 		}
 
-		private static Dictionary<string, string> CollectDefaultFlows(IEnumerable<ProcessBranchDTO> branches)
+		private static Dictionary<string, string> CollectDefaultFlows(IEnumerable<ProcessBranch> branches)
 		{
 			var defaultFlows = new Dictionary<string, string>(StringComparer.Ordinal);
-			foreach (var branch in branches.Where(IsDefaultBranch))
+			foreach (var branch in branches.Where(branch => branch.IsDefault))
 			{
 				if (!defaultFlows.TryAdd(branch.Source, branch.Id))
 				{
-					throw new InvalidRequestException($"The state '{branch.Source}' has more than one '{DefaultBranchType}' (default) branch.");
+					throw new InvalidRequestException($"The state '{branch.Source}' has more than one '{ProcessBranchTypes.Nor}' (default) branch.");
 				}
 			}
 
 			return defaultFlows;
 		}
 
-		private static bool IsDefaultBranch(ProcessBranchDTO branch) =>
-			string.Equals(branch.Type?.Trim(), DefaultBranchType, StringComparison.OrdinalIgnoreCase);
-
-		private static IReadOnlyDictionary<string, LayoutBounds> Arrange(IReadOnlyList<ProcessStateDTO> nodes, IEnumerable<ProcessBranchDTO> branches)
+		private static IReadOnlyDictionary<string, LayoutBounds> Arrange(IReadOnlyList<ProcessState> nodes, IEnumerable<ProcessBranch> branches)
 		{
 			var nodeIds = nodes.Select(node => node.Id).ToHashSet(StringComparer.Ordinal);
 			var edges = branches
@@ -134,7 +132,7 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 			return ProcessJsonLayout.Arrange(nodes.Select(node => (node.Id, ElementNameOf(node.Type))).ToList(), edges);
 		}
 
-		private static XElement CreateNode(ProcessStateDTO state, string? defaultFlowId, ETimeUnit timeUnit, string currency)
+		private static XElement CreateNode(ProcessState state, string? defaultFlowId, ETimeUnit timeUnit, string currency)
 		{
 			var element = new XElement(ModelNamespace + ElementNameOf(state.Type), new XAttribute("id", state.Id));
 			AddIfPresent(element, "name", state.Name);
@@ -146,7 +144,7 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 			return element;
 		}
 
-		private static XElement CreateSequenceFlow(ProcessBranchDTO branch)
+		private static XElement CreateSequenceFlow(ProcessBranch branch)
 		{
 			var flow = new XElement(ModelNamespace + "sequenceFlow",
 				new XAttribute("id", branch.Id),
@@ -173,7 +171,7 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 					new XAttribute("width", bounds.Width),
 					new XAttribute("height", bounds.Height)));
 
-		private static XElement CreateEdge(ProcessBranchDTO branch, LayoutBounds source, LayoutBounds target, HashSet<string> reservedIds) =>
+		private static XElement CreateEdge(ProcessBranch branch, LayoutBounds source, LayoutBounds target, HashSet<string> reservedIds) =>
 			new(DiNamespace + "BPMNEdge",
 				new XAttribute("id", Reserve(reservedIds, branch.Id + DiagramElementSuffix)),
 				new XAttribute("bpmnElement", branch.Id),

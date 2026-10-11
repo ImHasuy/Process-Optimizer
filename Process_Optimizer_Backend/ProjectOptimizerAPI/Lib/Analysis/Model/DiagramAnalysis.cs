@@ -19,8 +19,6 @@ namespace ProjectOptimizerAPI.Lib.Analysis.Model
 
 		public bool IsIndexable => AnalysisLimits.IsIndexable(ScenarioCount);
 
-		public bool IsSortable => AnalysisLimits.IsSortable(ScenarioCount);
-
 		public int ErrorCount => Issues.Count(issue => issue.Severity == EIssueSeverity.Error);
 
 		public int WarningCount => Issues.Count(issue => issue.Severity == EIssueSeverity.Warning);

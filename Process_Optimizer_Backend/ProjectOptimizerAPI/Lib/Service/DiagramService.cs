@@ -31,7 +31,7 @@ namespace ProjectOptimizerAPI.Lib.Service
 		public async Task<DiagramRevisionDTO> SaveJsonDiagramAsync(Guid projectId, DiagramJsonRevisionCreateDTO request)
 		{
 			var project = await projectAccessGuard.GetProjectAsync(projectId);
-			var bpmnXml = processJsonConverter.ToBpmnXml(request.States!, request.Branches!, project.TimeUnit, project.Currency);
+			var bpmnXml = processJsonConverter.ToBpmnXml(request.ToDiagram(), project.TimeUnit, project.Currency);
 			return await SaveRevisionAsync(project, bpmnXml, request.BaseRevision!.Value);
 		}
 

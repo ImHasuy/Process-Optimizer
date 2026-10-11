@@ -1,4 +1,4 @@
-using ProjectOptimizerLib.DTO;
+using ProjectOptimizerLib.Model.Process;
 
 namespace ProjectOptimizerTests.Infrastructure
 {
@@ -19,26 +19,29 @@ namespace ProjectOptimizerTests.Infrastructure
 }
 """;
 
-		public static ProcessStateDTO State(string id, string type, string? time = null, string? price = null, string? name = null) =>
+		public static ProcessDiagram Diagram(List<ProcessState> states, List<ProcessBranch> branches) =>
+			new() { States = states, Branches = branches };
+
+		public static ProcessState State(string id, string type, string? time = null, string? price = null, string? name = null) =>
 			new() { Id = id, Type = type, Time = time, Price = price, Name = name };
 
-		public static ProcessBranchDTO Branch(string id, string source, string target, string? type = "sequence", string? condition = null) =>
+		public static ProcessBranch Branch(string id, string source, string target, string? type = "sequence", string? condition = null) =>
 			new() { Id = id, Source = source, Target = target, Type = type, Condition = condition };
 
-		public static List<ProcessStateDTO> SampleStates() =>
+		public static List<ProcessState> SampleStates() =>
 		[
 			State("StartEvent_1", "bpmn:StartEvent", "", "", "Start"),
 			State("Activity_1", "bpmn:Task", "15m", "25 EUR", "Sample Task"),
 			State("EndEvent_1", "bpmn:EndEvent", "", "", "End")
 		];
 
-		public static List<ProcessBranchDTO> SampleBranches() =>
+		public static List<ProcessBranch> SampleBranches() =>
 		[
 			Branch("Flow_1", "StartEvent_1", "Activity_1"),
 			Branch("Flow_2", "Activity_1", "EndEvent_1")
 		];
 
-		public static List<ProcessStateDTO> ExclusiveChoiceStates() =>
+		public static List<ProcessState> ExclusiveChoiceStates() =>
 		[
 			State("Start", "bpmn:StartEvent"),
 			State("Split", "bpmn:ExclusiveGateway"),
@@ -48,7 +51,7 @@ namespace ProjectOptimizerTests.Infrastructure
 			State("End", "bpmn:EndEvent")
 		];
 
-		public static List<ProcessBranchDTO> ExclusiveChoiceBranches() =>
+		public static List<ProcessBranch> ExclusiveChoiceBranches() =>
 		[
 			Branch("F1", "Start", "Split"),
 			Branch("F2", "Split", "Cheap", "nor"),

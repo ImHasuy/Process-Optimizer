@@ -17,8 +17,6 @@ namespace ProjectOptimizerAPI.Lib.Repository
 
 		public Task<bool> ExistsAsync(Guid id) => Entities.AnyAsync(entity => EF.Property<Guid>(entity, "Id") == id);
 
-		public Task<List<TDto>> ListAsync<TDto>() => Entities.AsNoTracking().ProjectToType<TDto>().ToListAsync();
-
 		public async Task<TDto> GetRequiredAsync<TDto>(Guid id) =>
 			await Entities.AsNoTracking()
 				.Where(entity => EF.Property<Guid>(entity, "Id") == id)

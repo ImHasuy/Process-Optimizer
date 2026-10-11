@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using ProjectOptimizerLib.Enum;
 
 namespace ProjectOptimizerLib.DTO
 {
@@ -13,11 +12,5 @@ namespace ProjectOptimizerLib.DTO
 
 		[Range(1, FieldLimits.MaxPageSize, ErrorMessage = "The page size must be between 1 and 100.")]
 		public int? PageSize { get; set; }
-
-		[EnumDataType(typeof(EScenarioSortBy), ErrorMessage = "The sort field must be Index, TotalCost or TotalDuration.")]
-		public EScenarioSortBy? SortBy { get; set; }
-
-		[EnumDataType(typeof(ESortDirection), ErrorMessage = "The sort direction must be Asc or Desc.")]
-		public ESortDirection? SortDirection { get; set; }
 	}
 }

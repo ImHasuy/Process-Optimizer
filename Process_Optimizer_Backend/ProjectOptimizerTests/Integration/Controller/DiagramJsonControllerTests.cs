@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using ProjectOptimizerLib.DTO;
+using ProjectOptimizerLib.Model.Process;
 using ProjectOptimizerTests.Infrastructure;
 
 namespace ProjectOptimizerTests.Integration.Controller
@@ -110,7 +111,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 
 		private static string JsonRevisionsUrl(Guid projectId) => $"/api/projects/{projectId}/diagram/revisions/json";
 
-		private static object JsonRequest(List<ProcessStateDTO> states, List<ProcessBranchDTO> branches, int baseRevision) =>
+		private static object JsonRequest(List<ProcessState> states, List<ProcessBranch> branches, int baseRevision) =>
 			new { States = states, Branches = branches, BaseRevision = baseRevision };
 	}
 }

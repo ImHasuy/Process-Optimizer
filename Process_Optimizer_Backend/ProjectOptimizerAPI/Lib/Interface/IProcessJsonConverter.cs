@@ -1,10 +1,10 @@
-using ProjectOptimizerLib.DTO;
 using ProjectOptimizerLib.Enum;
+using ProjectOptimizerLib.Model.Process;
 
 namespace ProjectOptimizerAPI.Lib.Interface
 {
 	public interface IProcessJsonConverter
 	{
-		string ToBpmnXml(IReadOnlyList<ProcessStateDTO> states, IReadOnlyList<ProcessBranchDTO> branches, ETimeUnit timeUnit, string currency);
+		string ToBpmnXml(ProcessDiagram diagram, ETimeUnit timeUnit, string currency);
 	}
 }

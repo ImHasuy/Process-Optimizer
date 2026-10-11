@@ -21,13 +21,10 @@ namespace ProjectOptimizerAPI.Lib.Helper
 			UpdatedAt = now
 		};
 
-		public static void AddRevisions(Project project, IDiagramRevisionFactory revisionFactory, params string[] bpmnXmls)
+		public static void AddRevision(Project project, IDiagramRevisionFactory revisionFactory, string bpmnXml)
 		{
-			foreach (var bpmnXml in bpmnXmls)
-			{
-				project.LatestRevisionNumber++;
-				project.Revisions.Add(revisionFactory.Create(project.Id, project.LatestRevisionNumber, bpmnXml, project.CreatedAt));
-			}
+			project.LatestRevisionNumber++;
+			project.Revisions.Add(revisionFactory.Create(project.Id, project.LatestRevisionNumber, bpmnXml, project.CreatedAt));
 		}
 	}
 }

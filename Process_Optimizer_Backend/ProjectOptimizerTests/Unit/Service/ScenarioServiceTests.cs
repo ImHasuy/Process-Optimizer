@@ -271,46 +271,6 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task ListScenariosAsync_IndexDescending_ReturnsLastIndexFirst()
-		{
-			var project = await AddWorkedExampleProjectAsync();
-
-			var result = await _service.ListScenariosAsync(project.Id, Filter(EScenarioSortBy.Index, ESortDirection.Desc));
-
-			Assert.Equal([1L, 0L], result.Items.Select(item => item.Index));
-		}
-
-		[Fact]
-		public async Task ListScenariosAsync_SortByTotalCostDescending_ReturnsIndexOneFirst()
-		{
-			var project = await AddWorkedExampleProjectAsync();
-
-			var result = await _service.ListScenariosAsync(project.Id, Filter(EScenarioSortBy.TotalCost, ESortDirection.Desc));
-
-			Assert.Equal([1L, 0L], result.Items.Select(item => item.Index));
-		}
-
-		[Fact]
-		public async Task ListScenariosAsync_SortByTotalCostAscending_ReturnsIndexZeroFirst()
-		{
-			var project = await AddWorkedExampleProjectAsync();
-
-			var result = await _service.ListScenariosAsync(project.Id, Filter(EScenarioSortBy.TotalCost, ESortDirection.Asc));
-
-			Assert.Equal([0L, 1L], result.Items.Select(item => item.Index));
-		}
-
-		[Fact]
-		public async Task ListScenariosAsync_SortByTotalDurationAscending_ReturnsIndexOneFirst()
-		{
-			var project = await AddWorkedExampleProjectAsync();
-
-			var result = await _service.ListScenariosAsync(project.Id, Filter(EScenarioSortBy.TotalDuration, ESortDirection.Asc));
-
-			Assert.Equal([1L, 0L], result.Items.Select(item => item.Index));
-		}
-
-		[Fact]
 		public async Task ListScenariosAsync_SecondPageOfSizeOne_ReturnsIndexOne()
 		{
 			var project = await AddWorkedExampleProjectAsync();
@@ -332,17 +292,6 @@ namespace ProjectOptimizerTests.Unit.Service
 
 			Assert.Empty(result.Items);
 			Assert.Equal(2, result.TotalCount);
-		}
-
-		[Fact]
-		public async Task ListScenariosAsync_SortAboveTenThousandScenarios_ThrowsInvalidRequest()
-		{
-			var project = await TestData.AddProjectAsync(bpmnXml: BpmnDiagramBuilder.SequentialExclusiveChoices(FourteenChoices));
-
-			var exception = await Assert.ThrowsAsync<InvalidRequestException>(
-				() => _service.ListScenariosAsync(project.Id, Filter(EScenarioSortBy.TotalCost, ESortDirection.Asc)));
-
-			Assert.Equal(ErrorMessages.TooManyScenariosToSort, exception.Message);
 		}
 
 		[Fact]
@@ -473,9 +422,6 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		private Task<Project> AddWorkedExampleProjectAsync() => TestData.AddProjectAsync(bpmnXml: BpmnFixtures.WorkedExample);
-
-		private static ScenarioFilterDTO Filter(EScenarioSortBy sortBy, ESortDirection direction) =>
-			new() { SortBy = sortBy, SortDirection = direction };
 
 		private static string WorkedExampleWithPessimisticBackend() =>
 			BpmnFixtures.WorkedExample.Replace(

@@ -7,15 +7,12 @@ namespace ProjectOptimizerAPI.Controllers
 	[Route("api/projects")]
 	public sealed class ProjectController(IProjectService projectService) : ApiControllerBase
 	{
-		/// <summary>Lists projects with optional case-insensitive name search, sorting and paging.</summary>
-		/// <param name="filter">Search term, sort field (Name, CreatedAt, UpdatedAt), sort direction (Asc, Desc), page (default 1) and page size (default 20, at most 100). Without sort parameters the newest updated project comes first.</param>
-		/// <returns>One page of projects with the total number of matching projects.</returns>
-		/// <response code="200">The requested page of projects, possibly empty.</response>
-		/// <response code="400">A query parameter is invalid (unknown sort field or direction, page below 1, page size outside 1-100, search term longer than 100 characters).</response>
+		/// <summary>Lists all projects, the most recently updated first.</summary>
+		/// <returns>The projects with the summary of their latest diagram revision.</returns>
+		/// <response code="200">The list of projects, possibly empty.</response>
 		[HttpGet]
-		[ProducesResponseType(typeof(ApiResponse<PagedResultDTO<ProjectListItemDTO>>), StatusCodes.Status200OK)]
-		[ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
-		public async Task<IActionResult> ListProjects([FromQuery] ProjectFilterDTO filter) => Success(await projectService.ListProjectsAsync(filter));
+		[ProducesResponseType(typeof(ApiResponse<List<ProjectListItemDTO>>), StatusCodes.Status200OK)]
+		public async Task<IActionResult> ListProjects() => Success(await projectService.ListProjectsAsync());
 
 		/// <summary>Creates a project together with revision 1 holding the default diagram.</summary>
 		/// <param name="request">The name (required, unique ignoring case and surrounding spaces), optional description, time unit (default Days) and currency (default EUR).</param>
@@ -74,22 +71,6 @@ namespace ProjectOptimizerAPI.Controllers
 		{
 			await projectService.DeleteProjectAsync(id);
 			return NoContent();
-		}
-
-		/// <summary>Copies a project: the copy is named "&lt;name&gt; (copy)" (then " (copy) 2", " (copy) 3", ...) and gets the latest diagram of the source as its revision 1.</summary>
-		/// <param name="id">The identifier of the project to copy.</param>
-		/// <returns>The created copy with its latest revision summary.</returns>
-		/// <response code="201">The copy was created; the Location header points to it.</response>
-		/// <response code="404">No project exists with the given identifier.</response>
-		/// <response code="409">The copy name was taken concurrently.</response>
-		[HttpPost("{id:guid}/copies")]
-		[ProducesResponseType(typeof(ApiResponse<ProjectDetailsDTO>), StatusCodes.Status201Created)]
-		[ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
-		[ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
-		public async Task<IActionResult> CopyProject(Guid id)
-		{
-			var copy = await projectService.CopyProjectAsync(id);
-			return Created(nameof(GetProject), new { id = copy.Id }, copy);
 		}
 	}
 }

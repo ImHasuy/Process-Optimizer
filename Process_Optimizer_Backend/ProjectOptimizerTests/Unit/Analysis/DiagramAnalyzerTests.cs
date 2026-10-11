@@ -12,8 +12,6 @@ namespace ProjectOptimizerTests.Unit.Analysis
 	public sealed class DiagramAnalyzerTests
 	{
 		private const string MalformedXml = "<bpmn:definitions";
-		private const int SortLimitExceedingChoices = 14;
-		private const int SortLimitFittingChoices = 13;
 		private const int ThousandNodeChainTasks = 998;
 		private static readonly TimeSpan GenerousAnalysisLimit = TimeSpan.FromSeconds(5);
 
@@ -163,101 +161,6 @@ namespace ProjectOptimizerTests.Unit.Analysis
 			var analysis = _components.Analyze(DefaultDiagram.Xml);
 
 			Assert.Throws<InvalidOperationException>(() => _components.Analyzer.GetScenario(analysis, 0));
-		}
-
-		[Fact]
-		public void GetSortedScenarioIndices_ByTotalCostAscending_ReturnsZeroThenOne()
-		{
-			var analysis = _components.Analyze(BpmnFixtures.WorkedExample);
-
-			var sorted = _components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalCost, ESortDirection.Asc);
-
-			Assert.Equal(new[] { 0L, 1L }, sorted);
-		}
-
-		[Fact]
-		public void GetSortedScenarioIndices_ByTotalCostDescending_ReturnsOneThenZero()
-		{
-			var analysis = _components.Analyze(BpmnFixtures.WorkedExample);
-
-			var sorted = _components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalCost, ESortDirection.Desc);
-
-			Assert.Equal(new[] { 1L, 0L }, sorted);
-		}
-
-		[Fact]
-		public void GetSortedScenarioIndices_ByTotalDurationAscending_ReturnsOneThenZero()
-		{
-			var analysis = _components.Analyze(BpmnFixtures.WorkedExample);
-
-			var sorted = _components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalDuration, ESortDirection.Asc);
-
-			Assert.Equal(new[] { 1L, 0L }, sorted);
-		}
-
-		[Theory]
-		[InlineData(ESortDirection.Asc)]
-		[InlineData(ESortDirection.Desc)]
-		public void GetSortedScenarioIndices_TiedValues_KeepIndexOrder(ESortDirection direction)
-		{
-			var analysis = _components.Analyze(TiedBranchesDiagram());
-
-			var sorted = _components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalCost, direction);
-
-			Assert.Equal(new[] { 0L, 1L, 2L }, sorted);
-		}
-
-		[Fact]
-		public void GetSortedScenarioIndices_SameRequestTwice_ReturnsCachedList()
-		{
-			var analysis = _components.Analyze(BpmnFixtures.WorkedExample);
-			var first = _components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalCost, ESortDirection.Asc);
-
-			var second = _components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalCost, ESortDirection.Asc);
-
-			Assert.Same(first, second);
-			Assert.True(_components.Cache.TryGetValue($"scn-sort:{analysis.ContentSha256}:{EScenarioSortBy.TotalCost}:{ESortDirection.Asc}", out IReadOnlyList<long>? cached));
-			Assert.Same(first, cached);
-		}
-
-		[Fact]
-		public void GetSortedScenarioIndices_AfterSorting_DoesNotFillScenarioCache()
-		{
-			var analysis = _components.Analyze(BpmnFixtures.WorkedExample);
-
-			_components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalDuration, ESortDirection.Asc);
-
-			Assert.False(_components.Cache.TryGetValue($"scn:{analysis.ContentSha256}:{AnalysisLimits.OrderingVersion}:0", out _));
-			Assert.False(_components.Cache.TryGetValue($"scn:{analysis.ContentSha256}:{AnalysisLimits.OrderingVersion}:1", out _));
-		}
-
-		[Fact]
-		public void GetSortedScenarioIndices_CountAtSortableSize_ReturnsEveryIndex()
-		{
-			var analysis = _components.Analyze(BpmnDiagramBuilder.SequentialExclusiveChoices(SortLimitFittingChoices));
-
-			var sorted = _components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalDuration, ESortDirection.Asc);
-
-			Assert.Equal((long)analysis.ScenarioCount, sorted.Count);
-			Assert.Equal(sorted.Count, sorted.Distinct().Count());
-		}
-
-		[Fact]
-		public void GetSortedScenarioIndices_CountAboveSortLimit_ThrowsInvalidOperation()
-		{
-			var analysis = _components.Analyze(BpmnDiagramBuilder.SequentialExclusiveChoices(SortLimitExceedingChoices));
-
-			Assert.Throws<InvalidOperationException>(() => _components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalCost, ESortDirection.Asc));
-
-			Assert.True(analysis.ScenarioCount > AnalysisLimits.MaxSortableScenarios);
-		}
-
-		[Fact]
-		public void GetSortedScenarioIndices_DiagramWithoutStructure_ThrowsInvalidOperation()
-		{
-			var analysis = _components.Analyze(DefaultDiagram.Xml);
-
-			Assert.Throws<InvalidOperationException>(() => _components.Analyzer.GetSortedScenarioIndices(analysis, EScenarioSortBy.TotalCost, ESortDirection.Asc));
 		}
 
 		private static string TiedBranchesDiagram()

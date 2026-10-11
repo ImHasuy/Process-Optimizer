@@ -25,7 +25,7 @@ namespace ProjectOptimizerAPI.Lib.Service
 		{
 			var indexed = await scenarioCatalog.GetIndexedRevisionAsync(projectId, filter.Revision);
 			var paging = PageRequest.Resolve(filter.Page, filter.PageSize);
-			var pageIndices = SelectPageIndices(indexed, filter, paging);
+			var pageIndices = SelectPageIndices(indexed.Count, paging);
 
 			return new PagedResultDTO<ScenarioListItemDTO>
 			{
@@ -52,28 +52,11 @@ namespace ProjectOptimizerAPI.Lib.Service
 			return resourceLimitCalculator.Calculate(analysis.Graph, analysis.Structure!, basis, analyzed.Revision.Context);
 		}
 
-		private IEnumerable<long> SelectPageIndices(IndexedRevision indexed, ScenarioFilterDTO filter, PageRequest paging)
+		private static IEnumerable<long> SelectPageIndices(long count, PageRequest paging)
 		{
-			var (offset, pageSize) = (paging.Offset, paging.PageSize);
-			var sortBy = filter.SortBy ?? EScenarioSortBy.Index;
-			var direction = filter.SortDirection ?? ESortDirection.Asc;
-			EnsureScenariosCanBeSorted(sortBy, indexed.Count);
-			if (offset >= indexed.Count)
+			for (var index = paging.Offset; index < Math.Min(count, paging.Offset + paging.PageSize); index++)
 			{
-				return [];
-			}
-
-			return sortBy == EScenarioSortBy.Index
-				? SelectCanonicalIndices(indexed.Count, direction, offset, pageSize)
-				: diagramAnalyzer.GetSortedScenarioIndices(indexed.Analysis, sortBy, direction).Skip((int)offset).Take(pageSize);
-		}
-
-		private static IEnumerable<long> SelectCanonicalIndices(long count, ESortDirection direction, long offset, int pageSize)
-		{
-			var size = Math.Min(pageSize, count - offset);
-			for (long position = offset; position < offset + size; position++)
-			{
-				yield return direction == ESortDirection.Asc ? position : count - 1 - position;
+				yield return index;
 			}
 		}
 
@@ -82,14 +65,6 @@ namespace ProjectOptimizerAPI.Lib.Service
 			if (!indexed.Contains(index))
 			{
 				throw new NotFoundException(ErrorMessages.ScenarioNotFound);
-			}
-		}
-
-		private static void EnsureScenariosCanBeSorted(EScenarioSortBy sortBy, long count)
-		{
-			if (sortBy != EScenarioSortBy.Index && !AnalysisLimits.IsSortable(count))
-			{
-				throw new InvalidRequestException(ErrorMessages.TooManyScenariosToSort);
 			}
 		}
 	}

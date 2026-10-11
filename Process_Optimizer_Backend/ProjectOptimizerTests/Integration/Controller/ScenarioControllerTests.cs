@@ -147,35 +147,11 @@ namespace ProjectOptimizerTests.Integration.Controller
 			Assert.Equal(2, page.TotalCount);
 		}
 
-		[Fact]
-		public async Task ListScenarios_SortByTotalCostDescending_ReturnsIndexOneFirst()
-		{
-			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);
-
-			var response = await _client.GetAsync($"{ScenariosUrl(projectId)}?sortBy=TotalCost&sortDirection=Desc");
-
-			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-			var page = (await response.ReadApiResponseAsync<PagedResultDTO<ScenarioListItemDTO>>()).Data!;
-			Assert.Equal([1L, 0L], page.Items.Select(item => item.Index));
-		}
-
-		[Fact]
-		public async Task ListScenarios_SortAboveTenThousandScenarios_ReturnsBadRequest()
-		{
-			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnDiagramBuilder.SequentialExclusiveChoices(14));
-
-			var response = await _client.GetAsync($"{ScenariosUrl(projectId)}?sortBy=TotalDuration");
-
-			await response.AssertApiErrorAsync(HttpStatusCode.BadRequest, ErrorMessages.TooManyScenariosToSort);
-		}
-
 		[Theory]
 		[InlineData("pageSize=0", "PageSize")]
 		[InlineData("pageSize=101", "PageSize")]
 		[InlineData("page=0", "Page")]
 		[InlineData("revision=0", "Revision")]
-		[InlineData("sortBy=Name", "SortBy")]
-		[InlineData("sortDirection=Sideways", "SortDirection")]
 		public async Task ListScenarios_InvalidQuery_ReturnsBadRequestWithErrors(string query, string field)
 		{
 			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);

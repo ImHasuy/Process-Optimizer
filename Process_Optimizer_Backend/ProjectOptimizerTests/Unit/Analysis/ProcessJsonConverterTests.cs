@@ -1,7 +1,7 @@
 using System.Xml.Linq;
 using ProjectOptimizerAPI.Lib.Analysis;
 using ProjectOptimizerAPI.Lib.Exceptions;
-using ProjectOptimizerLib.DTO;
+using ProjectOptimizerLib.Model.Process;
 using ProjectOptimizerLib.Enum;
 using ProjectOptimizerTests.Infrastructure;
 using static ProjectOptimizerTests.Infrastructure.ProcessJsonFixtures;
@@ -40,7 +40,7 @@ namespace ProjectOptimizerTests.Unit.Analysis
 		[InlineData(ETimeUnit.Days, "0.010417")]
 		public void ToBpmnXml_TimeWithUnit_StoresDurationInProjectUnit(ETimeUnit timeUnit, string expected)
 		{
-			var xml = _converter.ToBpmnXml(SampleStates(), SampleBranches(), timeUnit, "EUR");
+			var xml = _converter.ToBpmnXml(Diagram(SampleStates(), SampleBranches()), timeUnit, "EUR");
 
 			var graph = _analysis.Parser.Parse(xml);
 
@@ -121,8 +121,8 @@ namespace ProjectOptimizerTests.Unit.Analysis
 		[Fact]
 		public void ToBpmnXml_CyclicBranches_StillLaysOutEveryNodeAndReportsCycle()
 		{
-			var states = new List<ProcessStateDTO> { State("S", "bpmn:StartEvent"), State("A", "bpmn:Task", "1", "1"), State("B", "bpmn:Task", "1", "1"), State("E", "bpmn:EndEvent") };
-			var branches = new List<ProcessBranchDTO> { Branch("F1", "S", "A"), Branch("F2", "A", "B"), Branch("F3", "B", "A"), Branch("F4", "B", "E") };
+			var states = new List<ProcessState> { State("S", "bpmn:StartEvent"), State("A", "bpmn:Task", "1", "1"), State("B", "bpmn:Task", "1", "1"), State("E", "bpmn:EndEvent") };
+			var branches = new List<ProcessBranch> { Branch("F1", "S", "A"), Branch("F2", "A", "B"), Branch("F3", "B", "A"), Branch("F4", "B", "E") };
 
 			var xml = Convert(states, branches);
 
@@ -171,7 +171,7 @@ namespace ProjectOptimizerTests.Unit.Analysis
 		{
 			var states = SampleStates();
 			states[1].Id = "Process_1";
-			var branches = new List<ProcessBranchDTO> { Branch("Flow_1", "StartEvent_1", "Process_1"), Branch("Flow_2", "Process_1", "EndEvent_1") };
+			var branches = new List<ProcessBranch> { Branch("Flow_1", "StartEvent_1", "Process_1"), Branch("Flow_2", "Process_1", "EndEvent_1") };
 
 			var document = XDocument.Parse(Convert(states, branches));
 
@@ -231,8 +231,8 @@ namespace ProjectOptimizerTests.Unit.Analysis
 			Assert.Equal("The state 'Split' has more than one 'nor' (default) branch.", exception.Message);
 		}
 
-		private string Convert(IReadOnlyList<ProcessStateDTO> states, IReadOnlyList<ProcessBranchDTO> branches) =>
-			_converter.ToBpmnXml(states, branches, ETimeUnit.Days, "EUR");
+		private string Convert(List<ProcessState> states, List<ProcessBranch> branches) =>
+			_converter.ToBpmnXml(Diagram(states, branches), ETimeUnit.Days, "EUR");
 
 		private static XElement TaskElement(string xml, string id) =>
 			XDocument.Parse(xml).Descendants(ModelNamespace + "process").Single().Elements().Single(element => (string?)element.Attribute("id") == id);

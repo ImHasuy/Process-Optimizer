@@ -26,10 +26,10 @@ namespace ProjectOptimizerAPI.Controllers
 
 		/// <summary>Lists one page of the scenarios of a diagram revision.</summary>
 		/// <param name="projectId">The identifier of the project.</param>
-		/// <param name="filter">The optional revision, page, page size, sort field and sort direction.</param>
+		/// <param name="filter">The optional revision, page (default 1) and page size (default 20, at most 100). Scenarios are returned in index order.</param>
 		/// <returns>One page of scenario summaries and the total scenario count.</returns>
 		/// <response code="200">The requested page of scenarios, possibly empty.</response>
-		/// <response code="400">A query value is invalid, the revision does not exist or there are too many scenarios to sort.</response>
+		/// <response code="400">A query value is invalid or the revision does not exist.</response>
 		/// <response code="404">No project exists with the given identifier.</response>
 		/// <response code="409">The diagram has errors or too many scenarios to index.</response>
 		[HttpGet("scenarios")]
