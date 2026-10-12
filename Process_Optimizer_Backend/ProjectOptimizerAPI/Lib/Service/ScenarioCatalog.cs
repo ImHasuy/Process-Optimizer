@@ -5,7 +5,7 @@ using ProjectOptimizerAPI.Lib.Interface;
 
 namespace ProjectOptimizerAPI.Lib.Service
 {
-	public sealed class ScenarioCatalog(IDiagramResolver diagramResolver, IDiagramAnalyzer diagramAnalyzer, IScenarioIndexer scenarioIndexer) : IScenarioCatalog
+	public sealed class ScenarioCatalog(IDiagramResolver diagramResolver, IDiagramAnalyzer diagramAnalyzer) : IScenarioCatalog
 	{
 		public async Task<AnalyzedDiagram> GetOptimizableDiagramAsync(Guid projectId)
 		{
@@ -21,27 +21,12 @@ namespace ProjectOptimizerAPI.Lib.Service
 			return new IndexedDiagram(analyzed.Diagram, analyzed.Analysis, (long)analyzed.Analysis.ScenarioCount);
 		}
 
-		public async Task<Func<string, long?>> CreateRankerAsync(Guid projectId)
-		{
-			var analysis = (await AnalyzeAsync(projectId)).Analysis;
-			if (!IsIndexable(analysis))
-			{
-				return _ => null;
-			}
-
-			var structure = analysis.Structure!;
-			return scenarioKey => scenarioIndexer.Rank(structure, scenarioKey);
-		}
-
 		private async Task<AnalyzedDiagram> AnalyzeAsync(Guid projectId)
 		{
 			var diagram = await diagramResolver.ResolveAsync(projectId);
 			var analysis = diagramAnalyzer.Analyze(diagram.ContentSha256, diagram.BpmnXml);
 			return new AnalyzedDiagram(diagram, analysis);
 		}
-
-		private static bool IsIndexable(DiagramAnalysis analysis) =>
-			analysis.HasOptimizableStructure && analysis.IsIndexable;
 
 		private static void EnsureOptimizable(DiagramAnalysis analysis)
 		{

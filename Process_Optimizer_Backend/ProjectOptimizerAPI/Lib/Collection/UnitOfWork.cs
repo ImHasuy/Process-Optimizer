@@ -9,15 +9,13 @@ namespace ProjectOptimizerAPI.Lib.Collection
 	public sealed class UnitOfWork(
 		ProjectOptimizerDbContext dbContext,
 		IProjectRepository projectRepository,
-		IDiagramRepository diagramRepository,
-		ISavedScenarioRepository savedScenarioRepository) : IUnitOfWork
+		IDiagramRepository diagramRepository) : IUnitOfWork
 	{
 		private const int SqliteConstraintUnique = 2067;
 		private const int SqliteConstraintPrimaryKey = 1555;
 
 		public IProjectRepository ProjectRepository { get; } = projectRepository;
 		public IDiagramRepository DiagramRepository { get; } = diagramRepository;
-		public ISavedScenarioRepository SavedScenarioRepository { get; } = savedScenarioRepository;
 
 		public Task SaveChangesAsync() => dbContext.SaveChangesAsync();
 

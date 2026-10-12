@@ -95,4 +95,4 @@ All four fields are sent; `name`, `timeUnit` and `currency` are required. Stored
 DELETE /api/projects/{id}
 ```
 
-Deletes its diagram and saved scenarios too. → `204`. Errors: `404`.
+Deletes its diagram too. → `204`. Errors: `404`.

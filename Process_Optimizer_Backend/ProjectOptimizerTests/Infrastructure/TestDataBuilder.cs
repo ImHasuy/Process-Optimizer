@@ -37,36 +37,5 @@ namespace ProjectOptimizerTests.Infrastructure
 			await dbContext.SaveChangesAsync();
 			return project.Diagram;
 		}
-
-		public async Task<SavedScenario> AddSavedScenarioAsync(Project project, string name, long scenarioIndex = 0, string scenarioKey = "")
-		{
-			var savedScenario = new SavedScenario
-			{
-				Id = Guid.NewGuid(),
-				ProjectId = project.Id,
-				Name = name,
-				NormalizedName = NameNormalizer.Normalize(name),
-				ScenarioIndex = scenarioIndex,
-				OrderingVersion = AnalysisLimits.OrderingVersion,
-				ScenarioKey = scenarioKey,
-				SnapshotJson = ScenarioSnapshotSerializer.Serialize(CreateSnapshot(project, scenarioIndex, scenarioKey)),
-				CreatedAt = now
-			};
-			dbContext.SavedScenarios.Add(savedScenario);
-			await dbContext.SaveChangesAsync();
-			return savedScenario;
-		}
-
-		private static ScenarioDTO CreateSnapshot(Project project, long scenarioIndex, string scenarioKey) =>
-			new()
-			{
-				ProjectId = project.Id,
-				OrderingVersion = AnalysisLimits.OrderingVersion,
-				Index = scenarioIndex,
-				Count = 1,
-				Key = scenarioKey,
-				TimeUnit = project.TimeUnit,
-				Currency = project.Currency
-			};
 	}
 }

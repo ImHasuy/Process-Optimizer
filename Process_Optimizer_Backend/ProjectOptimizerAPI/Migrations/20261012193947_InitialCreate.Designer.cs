@@ -11,7 +11,7 @@ using ProjectOptimizerAPI.Lib.Database;
 namespace ProjectOptimizerAPI.Migrations
 {
     [DbContext(typeof(ProjectOptimizerDbContext))]
-    [Migration("20261012192037_InitialCreate")]
+    [Migration("20261012193947_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -109,61 +109,6 @@ namespace ProjectOptimizerAPI.Migrations
                     b.ToTable("Projects", (string)null);
                 });
 
-            modelBuilder.Entity("ProjectOptimizerLib.Model.SavedScenario", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("OrderingVersion")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("ScenarioIndex")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("ScenarioKey")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SnapshotJson")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("TotalCost")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("TotalDuration")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId", "NormalizedName")
-                        .IsUnique();
-
-                    b.ToTable("SavedScenarios", (string)null);
-                });
-
             modelBuilder.Entity("ProjectOptimizerLib.Model.Diagram", b =>
                 {
                     b.HasOne("ProjectOptimizerLib.Model.Project", "Project")
@@ -175,23 +120,10 @@ namespace ProjectOptimizerAPI.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("ProjectOptimizerLib.Model.SavedScenario", b =>
-                {
-                    b.HasOne("ProjectOptimizerLib.Model.Project", "Project")
-                        .WithMany("SavedScenarios")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
-                });
-
             modelBuilder.Entity("ProjectOptimizerLib.Model.Project", b =>
                 {
                     b.Navigation("Diagram")
                         .IsRequired();
-
-                    b.Navigation("SavedScenarios");
                 });
 #pragma warning restore 612, 618
         }

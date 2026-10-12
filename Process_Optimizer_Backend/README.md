@@ -10,7 +10,7 @@ There are no users and no authentication, so **do not expose this API to the int
 ## What it does
 
 1. **Projects:** create, list, read, update and delete. A project has a unique name, a time unit (Minutes, Hours,
-   Days, Weeks) and a currency. Deleting a project also deletes its diagram and saved scenarios.
+   Days, Weeks) and a currency. Deleting a project also deletes its diagram.
 2. **Diagram:** each project has exactly one diagram. Saving overwrites it; there is no history and the last save
    wins.
    - Save the frontend's JSON export (`PUT …/diagram/json`), or a raw BPMN XML (`PUT …/diagram`).
@@ -18,13 +18,11 @@ There are no users and no authentication, so **do not expose this API to the int
 3. **Validation (internal, no endpoint):** every save is checked against 17 rules (DV-01 … DV-17) such as "no start
    event", "unreachable node" or "cycle". Issues never block saving; the diagram only carries its `errorCount`,
    `warningCount` and `isOptimizable`. The scenario endpoints answer 409 for a diagram with errors.
-4. **Scenarios:** the scenario count, a paged list of scenarios, and one scenario in detail. The detail includes the
-   schedule of each activity (earliest/latest start and finish, slack), the critical path, the total duration and
-   the total cost.
+4. **Scenarios:** get the scenario count, then fetch the scenarios one by one by index or all at once (up to 1000).
+   Each scenario includes the schedule of each activity (earliest/latest start and finish, slack), the critical path,
+   the total duration and the total cost. Scenarios are computed on request and never stored.
 5. **Resource limits:** the minimum and maximum cost and critical-path duration over all scenarios, using either
    the planned or the pessimistic estimates.
-6. **Saved scenarios:** named, frozen snapshots of a scenario, with a note. `isAvailable` tells whether the same
-   gateway choices still exist after the diagram was overwritten.
 
 ## The frontend JSON format
 
@@ -73,18 +71,16 @@ with an `errors` object listing the problems for each field.
 | PUT | `/projects/{projectId}/diagram` | Overwrite the diagram with a BPMN XML |
 | GET | `/projects/{projectId}/diagram/file` | Download the diagram as `.bpmn` |
 | GET | `/projects/{projectId}/scenario-count` | Number of scenarios |
-| GET | `/projects/{projectId}/scenarios?page=&pageSize=` | One page of scenarios (default page 1, size 20, max 100) |
+| GET | `/projects/{projectId}/scenarios` | All scenarios (409 above 1000 — then fetch them one by one) |
 | GET | `/projects/{projectId}/scenarios/{index}` | One scenario with its schedule and critical path |
 | GET | `/projects/{projectId}/resource-limits?basis=` | Cost and duration limits (`Planned` or `Pessimistic`) |
-| POST / GET | `/projects/{projectId}/saved-scenarios` | Save a scenario snapshot / list saved scenarios |
-| GET / PUT / DELETE | `/projects/{projectId}/saved-scenarios/{id}` | Read, rename or delete a saved scenario |
 
 Scenario endpoints always use the project's current diagram.
 
 Status codes:
 - **400:** invalid input.
-- **404:** unknown project, saved scenario or scenario index.
-- **409:** a name conflict, or a diagram that has errors or too many scenarios.
+- **404:** unknown project or scenario index.
+- **409:** a name conflict, a diagram that has errors or too many scenarios, or more than 1000 scenarios for `GET …/scenarios`.
 
 ## Further documentation
 
@@ -112,7 +108,7 @@ origins go in `Cors:AllowedOrigins` in `appsettings.Development.json`.
 
 - SQLite file `ProjectOptimizerAPI/projectoptimizer.db`, connection string `DefaultConnection`.
 - Migrations are applied on startup. The database starts empty; there is no seed data.
-- Tables: `Projects`, `Diagrams` (one row per project) and `SavedScenarios`.
+- Tables: `Projects` and `Diagrams` (one row per project).
 - The migrations were squashed into a single `InitialCreate`. A `projectoptimizer.db` created before that will not
   start; delete it (see below).
 - To reset it, stop the API, delete `projectoptimizer.db` (and any `-shm` / `-wal` files), then start it again.
@@ -136,7 +132,7 @@ The tests include unit tests for the analysis engine and the services, and integ
 ```
 ProjectOptimizerAPI/              web project
   Controllers/                    one controller per resource; thin, they only call a service
-  Lib/Service/                    use cases: projects, diagrams, scenarios, saved scenarios
+  Lib/Service/                    use cases: projects, diagrams, scenarios
   Lib/Analysis/                   the analysis engine (pure, no database)
     ProcessJsonConverter.cs       frontend JSON  -> BPMN XML (with a generated layout)
     BpmnGraphParser.cs            BPMN XML       -> ProcessGraph
@@ -154,7 +150,7 @@ ProjectOptimizerAPI/              web project
   Lib/Helper/                     small utilities (time/price text conversion, hashing, paging, ...)
   Migrations/                     EF Core migrations
 ProjectOptimizerLib/              shared class library
-  Model/                          database entities: Project, Diagram, SavedScenario
+  Model/                          database entities: Project, Diagram
   Model/Process/                  the frontend JSON format: ProcessDiagram, ProcessState, ProcessBranch
   DTO/                            request and response shapes
   Enum/                           enums used by the API

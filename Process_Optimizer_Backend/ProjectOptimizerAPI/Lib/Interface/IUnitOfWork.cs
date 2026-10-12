@@ -4,7 +4,6 @@ namespace ProjectOptimizerAPI.Lib.Interface
 	{
 		IProjectRepository ProjectRepository { get; }
 		IDiagramRepository DiagramRepository { get; }
-		ISavedScenarioRepository SavedScenarioRepository { get; }
 
 		Task SaveChangesAsync();
 		Task SaveChangesOrConflictAsync(string conflictMessage);

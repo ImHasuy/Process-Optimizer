@@ -16,26 +16,28 @@ namespace ProjectOptimizerAPI.Lib.Service
 			return new ScenarioCountDTO { OrderingVersion = AnalysisLimits.OrderingVersion, Count = indexed.Count };
 		}
 
-		public async Task<PagedResultDTO<ScenarioListItemDTO>> ListScenariosAsync(Guid projectId, ScenarioFilterDTO filter)
+		public async Task<List<ScenarioDTO>> GetAllScenariosAsync(Guid projectId)
 		{
 			var indexed = await scenarioCatalog.GetIndexedDiagramAsync(projectId);
-			var paging = PageRequest.Resolve(filter.Page, filter.PageSize);
-
-			return new PagedResultDTO<ScenarioListItemDTO>
+			if (indexed.Count > AnalysisLimits.MaxListedScenarios)
 			{
-				Items = SelectPageIndices(indexed.Count, paging).Select(index => scenarioBuilder.ToListItem(diagramAnalyzer.GetScenario(indexed.Analysis, index))).ToList(),
-				Page = paging.Page,
-				PageSize = paging.PageSize,
-				TotalCount = indexed.Count
-			};
+				throw new ConflictException(ErrorMessages.TooManyScenariosToList);
+			}
+
+			var scenarios = new List<ScenarioDTO>();
+			for (var index = 0L; index < indexed.Count; index++)
+			{
+				scenarios.Add(BuildScenario(indexed, index));
+			}
+
+			return scenarios;
 		}
 
 		public async Task<ScenarioDTO> GetScenarioAsync(Guid projectId, long index)
 		{
 			var indexed = await scenarioCatalog.GetIndexedDiagramAsync(projectId);
 			EnsureScenarioExists(indexed, index);
-			var computation = diagramAnalyzer.GetScenario(indexed.Analysis, index);
-			return scenarioBuilder.ToDto(computation, indexed.Diagram.Context, indexed.Count);
+			return BuildScenario(indexed, index);
 		}
 
 		public async Task<ResourceLimitsDTO> GetResourceLimitsAsync(Guid projectId, ResourceLimitsQueryDTO query)
@@ -46,13 +48,8 @@ namespace ProjectOptimizerAPI.Lib.Service
 			return resourceLimitCalculator.Calculate(analysis.Graph, analysis.Structure!, basis, analyzed.Diagram.Context);
 		}
 
-		private static IEnumerable<long> SelectPageIndices(long count, PageRequest paging)
-		{
-			for (var index = paging.Offset; index < Math.Min(count, paging.Offset + paging.PageSize); index++)
-			{
-				yield return index;
-			}
-		}
+		private ScenarioDTO BuildScenario(IndexedDiagram indexed, long index) =>
+			scenarioBuilder.ToDto(diagramAnalyzer.GetScenario(indexed.Analysis, index), indexed.Diagram.Context, indexed.Count);
 
 		private static void EnsureScenarioExists(IndexedDiagram indexed, long index)
 		{

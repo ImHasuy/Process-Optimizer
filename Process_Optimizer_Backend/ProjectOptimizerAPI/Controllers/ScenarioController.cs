@@ -21,21 +21,18 @@ namespace ProjectOptimizerAPI.Controllers
 		public async Task<IActionResult> GetScenarioCount(Guid projectId) =>
 			Success(await scenarioService.GetScenarioCountAsync(projectId));
 
-		/// <summary>Lists one page of the scenarios of the project's diagram, in index order.</summary>
+		/// <summary>Returns every scenario of the project's diagram in index order, each with its activities, critical path and totals.</summary>
 		/// <param name="projectId">The identifier of the project.</param>
-		/// <param name="filter">The page (default 1) and page size (default 20, at most 100).</param>
-		/// <returns>One page of scenario summaries and the total scenario count.</returns>
-		/// <response code="200">The requested page of scenarios, possibly empty.</response>
-		/// <response code="400">A query value is invalid.</response>
+		/// <returns>All scenarios, the same shape as a single scenario.</returns>
+		/// <response code="200">All scenarios.</response>
 		/// <response code="404">No project exists with the given identifier.</response>
-		/// <response code="409">The diagram has errors or too many scenarios to index.</response>
+		/// <response code="409">The diagram has errors, too many scenarios to index, or more than 1000 scenarios (request them one by one).</response>
 		[HttpGet("scenarios")]
-		[ProducesResponseType(typeof(ApiResponse<PagedResultDTO<ScenarioListItemDTO>>), StatusCodes.Status200OK)]
-		[ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+		[ProducesResponseType(typeof(ApiResponse<List<ScenarioDTO>>), StatusCodes.Status200OK)]
 		[ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
 		[ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
-		public async Task<IActionResult> ListScenarios(Guid projectId, [FromQuery] ScenarioFilterDTO filter) =>
-			Success(await scenarioService.ListScenariosAsync(projectId, filter));
+		public async Task<IActionResult> GetAllScenarios(Guid projectId) =>
+			Success(await scenarioService.GetAllScenariosAsync(projectId));
 
 		/// <summary>Returns one scenario of the project's diagram by its canonical index.</summary>
 		/// <param name="projectId">The identifier of the project.</param>

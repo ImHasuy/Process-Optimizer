@@ -65,44 +65,5 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			await Assert.ThrowsAsync<NotFoundException>(() => ScenarioCatalog.GetOptimizableDiagramAsync(Guid.NewGuid()));
 		}
-
-		[Fact]
-		public async Task CreateRankerAsync_WorkedExample_RanksKeys()
-		{
-			var project = await TestData.AddProjectAsync(bpmnXml: BpmnFixtures.WorkedExample);
-
-			var ranker = await ScenarioCatalog.CreateRankerAsync(project.Id);
-
-			Assert.Equal(0, ranker("G3=E"));
-			Assert.Equal(1, ranker("G3=F"));
-		}
-
-		[Fact]
-		public async Task CreateRankerAsync_DiagramNotOptimizable_ReturnsNullForEveryKey()
-		{
-			var project = await TestData.AddProjectAsync(bpmnXml: BpmnFixtures.WorkedExample);
-			await TestData.SetDiagramAsync(project, DefaultDiagram.Xml);
-
-			var ranker = await ScenarioCatalog.CreateRankerAsync(project.Id);
-
-			Assert.Null(ranker("G3=E"));
-			Assert.Null(ranker("G3=F"));
-		}
-
-		[Fact]
-		public async Task CreateRankerAsync_TooManyScenarios_ReturnsNull()
-		{
-			var project = await TestData.AddProjectAsync(bpmnXml: BpmnDiagramBuilder.SequentialExclusiveChoices(FiftyFourChoices));
-
-			var ranker = await ScenarioCatalog.CreateRankerAsync(project.Id);
-
-			Assert.Null(ranker("Split1=Task1A"));
-		}
-
-		[Fact]
-		public async Task CreateRankerAsync_UnknownProject_ThrowsNotFound()
-		{
-			await Assert.ThrowsAsync<NotFoundException>(() => ScenarioCatalog.CreateRankerAsync(Guid.NewGuid()));
-		}
 	}
 }

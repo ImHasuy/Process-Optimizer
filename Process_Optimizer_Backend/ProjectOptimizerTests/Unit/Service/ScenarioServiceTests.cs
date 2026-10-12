@@ -13,7 +13,7 @@ namespace ProjectOptimizerTests.Unit.Service
 	public sealed class ScenarioServiceTests : ServiceTestBase
 	{
 		private const int FiftyFourChoices = 54;
-		private const int FourteenChoices = 14;
+		private const int TenChoices = 10;
 
 		private static readonly string[] Scenario0CriticalPath = ["S", "A", "G1", "B", "G2", "D", "G3", "E", "G4", "End"];
 		private static readonly string[] Scenario1CriticalPath = ["S", "A", "G1", "B", "G2", "D", "G3", "F", "G4", "End"];
@@ -215,79 +215,56 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task ListScenariosAsync_DefaultFilter_ReturnsCanonicalOrder()
+		public async Task GetAllScenariosAsync_WorkedExample_ReturnsEveryScenarioInIndexOrder()
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			var result = await _service.ListScenariosAsync(project.Id, new ScenarioFilterDTO());
+			var result = await _service.GetAllScenariosAsync(project.Id);
 
-			Assert.Equal([0L, 1L], result.Items.Select(item => item.Index));
-			Assert.Equal(["G3=E", "G3=F"], result.Items.Select(item => item.Key));
-			Assert.Equal(1, result.Page);
-			Assert.Equal(20, result.PageSize);
-			Assert.Equal(2, result.TotalCount);
+			Assert.Equal([0L, 1L], result.Select(scenario => scenario.Index));
+			Assert.Equal(["G3=E", "G3=F"], result.Select(scenario => scenario.Key));
+			Assert.Equal([21m, 20m], result.Select(scenario => scenario.TotalDuration));
+			Assert.Equal([23000m, 25000m], result.Select(scenario => scenario.TotalCost));
+			Assert.All(result, scenario => Assert.Equal(2, scenario.Count));
 		}
 
 		[Fact]
-		public async Task ListScenariosAsync_DefaultFilter_ReturnsGoldenTotals()
+		public async Task GetAllScenariosAsync_WorkedExample_MatchesSingleScenarios()
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			var result = await _service.ListScenariosAsync(project.Id, new ScenarioFilterDTO());
+			var result = await _service.GetAllScenariosAsync(project.Id);
 
-			Assert.Equal([21m, 20m], result.Items.Select(item => item.TotalDuration));
-			Assert.Equal([23000m, 25000m], result.Items.Select(item => item.TotalCost));
+			var single = await _service.GetScenarioAsync(project.Id, 1);
+			Assert.Equal(single.Key, result[1].Key);
+			Assert.Equal(single.CriticalPath, result[1].CriticalPath);
+			Assert.Equal(single.Activities.Select(activity => activity.BpmnId), result[1].Activities.Select(activity => activity.BpmnId));
 		}
 
 		[Fact]
-		public async Task ListScenariosAsync_SecondPageOfSizeOne_ReturnsIndexOne()
+		public async Task GetAllScenariosAsync_MoreThanThousandScenarios_ThrowsConflict()
 		{
-			var project = await AddWorkedExampleProjectAsync();
+			var project = await TestData.AddProjectAsync(bpmnXml: BpmnDiagramBuilder.SequentialExclusiveChoices(TenChoices));
 
-			var result = await _service.ListScenariosAsync(project.Id, new ScenarioFilterDTO { Page = 2, PageSize = 1 });
+			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.GetAllScenariosAsync(project.Id));
 
-			Assert.Equal(1, Assert.Single(result.Items).Index);
-			Assert.Equal(2, result.Page);
-			Assert.Equal(1, result.PageSize);
-			Assert.Equal(2, result.TotalCount);
+			Assert.Equal(ErrorMessages.TooManyScenariosToList, exception.Message);
 		}
 
 		[Fact]
-		public async Task ListScenariosAsync_PageBeyondCount_ReturnsEmptyItemsWithTotalCount()
-		{
-			var project = await AddWorkedExampleProjectAsync();
-
-			var result = await _service.ListScenariosAsync(project.Id, new ScenarioFilterDTO { Page = 2 });
-
-			Assert.Empty(result.Items);
-			Assert.Equal(2, result.TotalCount);
-		}
-
-		[Fact]
-		public async Task ListScenariosAsync_IndexOrderAboveTenThousandScenarios_ReturnsFirstPage()
-		{
-			var project = await TestData.AddProjectAsync(bpmnXml: BpmnDiagramBuilder.SequentialExclusiveChoices(FourteenChoices));
-
-			var result = await _service.ListScenariosAsync(project.Id, new ScenarioFilterDTO { PageSize = 3 });
-
-			Assert.Equal([0L, 1L, 2L], result.Items.Select(item => item.Index));
-			Assert.Equal(1L << FourteenChoices, result.TotalCount);
-		}
-
-		[Fact]
-		public async Task ListScenariosAsync_DiagramWithErrors_ThrowsConflict()
+		public async Task GetAllScenariosAsync_DiagramWithErrors_ThrowsConflict()
 		{
 			var project = await TestData.AddProjectAsync();
 
-			await Assert.ThrowsAsync<ConflictException>(() => _service.ListScenariosAsync(project.Id, new ScenarioFilterDTO()));
+			await Assert.ThrowsAsync<ConflictException>(() => _service.GetAllScenariosAsync(project.Id));
 		}
 
 		[Fact]
-		public async Task ListScenariosAsync_TooManyScenarios_ThrowsConflict()
+		public async Task GetAllScenariosAsync_TooManyScenariosToIndex_ThrowsConflict()
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: BpmnDiagramBuilder.SequentialExclusiveChoices(FiftyFourChoices));
 
-			await Assert.ThrowsAsync<ConflictException>(() => _service.ListScenariosAsync(project.Id, new ScenarioFilterDTO()));
+			await Assert.ThrowsAsync<ConflictException>(() => _service.GetAllScenariosAsync(project.Id));
 		}
 
 		[Fact]

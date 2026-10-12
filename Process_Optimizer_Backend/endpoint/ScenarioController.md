@@ -1,7 +1,7 @@
 # ScenarioController
 
-Scenarios of the project's current diagram: one per combination of exclusive/inclusive gateway choices. A diagram
-with errors → `409`.
+Scenarios of the project's current diagram: one per combination of exclusive/inclusive gateway choices. Get the count,
+then fetch them one by one (`/scenarios/{index}`, `0 … count-1`) or all at once. A diagram with errors → `409`.
 
 Examples below use this diagram: `Start → Split (xor) → Cheap (2d, 100 EUR) | Fast (1d, 300 EUR) → Join → End`.
 
@@ -13,40 +13,6 @@ GET /api/projects/{projectId}/scenario-count
 
 ```json
 { "orderingVersion": 1, "count": 2 }
-```
-
-## List (paged)
-
-```http
-GET /api/projects/{projectId}/scenarios?page=1&pageSize=20
-```
-
-`page` ≥ 1 (default 1), `pageSize` 1–100 (default 20). Ordered by index.
-
-```json
-{
-  "items": [
-    {
-      "index": 0,
-      "key": "Split=Cheap",
-      "choices": [ { "gatewayId": "Split", "gatewayKind": "ExclusiveGateway", "isControllable": true, "chosenTargetIds": ["Cheap"] } ],
-      "activityCount": 1,
-      "totalDuration": 2,
-      "totalCost": 100
-    },
-    {
-      "index": 1,
-      "key": "Split=Fast",
-      "choices": [ { "gatewayId": "Split", "gatewayKind": "ExclusiveGateway", "isControllable": true, "chosenTargetIds": ["Fast"] } ],
-      "activityCount": 1,
-      "totalDuration": 1,
-      "totalCost": 300
-    }
-  ],
-  "page": 1,
-  "pageSize": 20,
-  "totalCount": 2
-}
 ```
 
 ## Get one
@@ -82,6 +48,22 @@ GET /api/projects/{projectId}/scenarios/{index}
 ```
 
 Errors: `404` index ≥ count.
+
+## Get all
+
+```http
+GET /api/projects/{projectId}/scenarios
+```
+
+Every scenario, in index order, each in the same shape as **Get one**. More than 1000 scenarios → `409`
+("request them one by one").
+
+```json
+[
+  { "index": 0, "count": 2, "key": "Split=Cheap", "criticalPath": ["Start", "Split", "Cheap", "Join", "End"], "totalDuration": 2, "totalCost": 100, "…": "same fields as Get one" },
+  { "index": 1, "count": 2, "key": "Split=Fast",  "criticalPath": ["Start", "Split", "Fast", "Join", "End"],  "totalDuration": 1, "totalCost": 300, "…": "same fields as Get one" }
+]
+```
 
 ## Resource limits
 

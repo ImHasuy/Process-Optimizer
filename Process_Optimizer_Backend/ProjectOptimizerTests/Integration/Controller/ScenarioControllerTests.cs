@@ -110,35 +110,30 @@ namespace ProjectOptimizerTests.Integration.Controller
 		}
 
 		[Fact]
-		public async Task ListScenarios_DefaultPage_ReturnsTwoItems()
+		public async Task GetAllScenarios_WorkedExample_ReturnsBothScenarios()
 		{
 			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);
 
 			var response = await _client.GetAsync(ScenariosUrl(projectId));
 
 			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-			var page = (await response.ReadApiResponseAsync<PagedResultDTO<ScenarioListItemDTO>>()).Data!;
-			Assert.Equal(["G3=E", "G3=F"], page.Items.Select(item => item.Key));
-			Assert.Equal(1, page.Page);
-			Assert.Equal(20, page.PageSize);
-			Assert.Equal(2, page.TotalCount);
-		}
-
-		[Theory]
-		[InlineData("pageSize=0", "PageSize")]
-		[InlineData("pageSize=101", "PageSize")]
-		[InlineData("page=0", "Page")]
-		public async Task ListScenarios_InvalidQuery_ReturnsBadRequestWithErrors(string query, string field)
-		{
-			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);
-
-			var response = await _client.GetAsync($"{ScenariosUrl(projectId)}?{query}");
-
-			await response.AssertValidationErrorAsync(field);
+			var scenarios = (await response.ReadApiResponseAsync<List<ScenarioDTO>>()).Data!;
+			Assert.Equal(["G3=E", "G3=F"], scenarios.Select(scenario => scenario.Key));
+			Assert.All(scenarios, scenario => Assert.NotEmpty(scenario.CriticalPath));
 		}
 
 		[Fact]
-		public async Task ListScenarios_NewProject_ReturnsConflict()
+		public async Task GetAllScenarios_MoreThanThousandScenarios_ReturnsConflict()
+		{
+			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnDiagramBuilder.SequentialExclusiveChoices(10));
+
+			var response = await _client.GetAsync(ScenariosUrl(projectId));
+
+			await response.AssertApiErrorAsync(HttpStatusCode.Conflict, ErrorMessages.TooManyScenariosToList);
+		}
+
+		[Fact]
+		public async Task GetAllScenarios_NewProject_ReturnsConflict()
 		{
 			var project = await _client.CreateProjectAsync();
 
@@ -148,7 +143,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 		}
 
 		[Fact]
-		public async Task ListScenarios_UnknownProject_ReturnsNotFound()
+		public async Task GetAllScenarios_UnknownProject_ReturnsNotFound()
 		{
 			var response = await _client.GetAsync(ScenariosUrl(Guid.NewGuid()));
 

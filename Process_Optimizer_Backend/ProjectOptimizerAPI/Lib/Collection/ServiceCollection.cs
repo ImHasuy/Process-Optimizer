@@ -98,7 +98,6 @@ namespace ProjectOptimizerAPI.Lib.Collection
 
 			services.AddScoped<IProjectRepository, ProjectRepository>();
 			services.AddScoped<IDiagramRepository, DiagramRepository>();
-			services.AddScoped<ISavedScenarioRepository, SavedScenarioRepository>();
 			services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 			services.AddScoped<IProjectAccessGuard, ProjectAccessGuard>();
@@ -108,7 +107,6 @@ namespace ProjectOptimizerAPI.Lib.Collection
 			services.AddScoped<IProjectService, ProjectService>();
 			services.AddScoped<IDiagramService, DiagramService>();
 			services.AddScoped<IScenarioService, ScenarioService>();
-			services.AddScoped<ISavedScenarioService, SavedScenarioService>();
 			return services;
 		}
 	}

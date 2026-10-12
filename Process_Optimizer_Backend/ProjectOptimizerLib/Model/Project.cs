@@ -13,6 +13,5 @@ namespace ProjectOptimizerLib.Model
 		public DateTime CreatedAt { get; set; }
 		public DateTime UpdatedAt { get; set; }
 		public Diagram Diagram { get; set; } = null!;
-		public ICollection<SavedScenario> SavedScenarios { get; set; } = new List<SavedScenario>();
 	}
 }

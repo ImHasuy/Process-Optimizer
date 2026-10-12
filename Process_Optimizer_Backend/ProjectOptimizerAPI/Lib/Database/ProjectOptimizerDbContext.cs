@@ -7,7 +7,6 @@ namespace ProjectOptimizerAPI.Lib.Database
 	{
 		public DbSet<Project> Projects => Set<Project>();
 		public DbSet<Diagram> Diagrams => Set<Diagram>();
-		public DbSet<SavedScenario> SavedScenarios => Set<SavedScenario>();
 
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{

@@ -56,34 +56,6 @@ namespace ProjectOptimizerAPI.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "SavedScenarios",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    ProjectId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    NormalizedName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    Note = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
-                    ScenarioIndex = table.Column<long>(type: "INTEGER", nullable: false),
-                    OrderingVersion = table.Column<int>(type: "INTEGER", nullable: false),
-                    ScenarioKey = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: false),
-                    SnapshotJson = table.Column<string>(type: "TEXT", nullable: false),
-                    TotalDuration = table.Column<decimal>(type: "TEXT", nullable: false),
-                    TotalCost = table.Column<decimal>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_SavedScenarios", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_SavedScenarios_Projects_ProjectId",
-                        column: x => x.ProjectId,
-                        principalTable: "Projects",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
             migrationBuilder.CreateIndex(
                 name: "IX_Projects_NormalizedName",
                 table: "Projects",
@@ -94,12 +66,6 @@ namespace ProjectOptimizerAPI.Migrations
                 name: "IX_Projects_UpdatedAt",
                 table: "Projects",
                 column: "UpdatedAt");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_SavedScenarios_ProjectId_NormalizedName",
-                table: "SavedScenarios",
-                columns: new[] { "ProjectId", "NormalizedName" },
-                unique: true);
         }
 
         /// <inheritdoc />
@@ -107,9 +73,6 @@ namespace ProjectOptimizerAPI.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Diagrams");
-
-            migrationBuilder.DropTable(
-                name: "SavedScenarios");
 
             migrationBuilder.DropTable(
                 name: "Projects");

@@ -1,6 +1,5 @@
 @ProjectOptimizerAPI_HostAddress = http://localhost:5212
 @projectId = 00000000-0000-0000-0000-000000000000
-@savedScenarioId = 00000000-0000-0000-0000-000000000000
 
 # Typical flow: create a project, copy its id into @projectId, save the frontend's JSON export
 # (it overwrites the project's diagram), then read its scenarios and resource limits.
@@ -65,42 +64,14 @@ GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/file
 ### Scenario count
 GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenario-count
 
-### List scenarios
-GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios?page=1&pageSize=20
+### Get all scenarios
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios
 
-### Get scenario
+### Get one scenario by index (0 … count-1)
 GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios/1
 
 ### Resource limits
 GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/resource-limits?basis=Planned
-
-### Create saved scenario
-POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios
-Content-Type: application/json
-
-{
-  "scenarioIndex": 1,
-  "name": "Fast mover",
-  "note": "Faster but more expensive."
-}
-
-### List saved scenarios
-GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios
-
-### Get saved scenario
-GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{savedScenarioId}}
-
-### Update saved scenario
-PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{savedScenarioId}}
-Content-Type: application/json
-
-{
-  "name": "Fast mover (approved)",
-  "note": null
-}
-
-### Delete saved scenario
-DELETE {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{savedScenarioId}}
 
 ### Overwrite the diagram with a BPMN XML instead
 PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram

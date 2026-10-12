@@ -241,17 +241,15 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task DeleteProjectAsync_ExistingProject_RemovesDiagramAndSavedScenarios()
+		public async Task DeleteProjectAsync_ExistingProject_RemovesDiagram()
 		{
 			var project = await TestData.AddProjectAsync("Launch", BpmnFixtures.WorkedExample);
-			await TestData.AddSavedScenarioAsync(project, "Cheapest");
 			DbContext.ChangeTracker.Clear();
 
 			await CreateService().DeleteProjectAsync(project.Id);
 
 			Assert.False(await DbContext.Projects.AnyAsync(stored => stored.Id == project.Id));
 			Assert.False(await DbContext.Diagrams.AnyAsync(diagram => diagram.ProjectId == project.Id));
-			Assert.False(await DbContext.SavedScenarios.AnyAsync(scenario => scenario.ProjectId == project.Id));
 		}
 
 		[Fact]
@@ -259,13 +257,11 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var deleted = await TestData.AddProjectAsync("Deleted");
 			var kept = await TestData.AddProjectAsync("Kept");
-			await TestData.AddSavedScenarioAsync(kept, "Kept scenario");
 
 			await CreateService().DeleteProjectAsync(deleted.Id);
 
 			Assert.True(await DbContext.Projects.AnyAsync(stored => stored.Id == kept.Id));
 			Assert.True(await DbContext.Diagrams.AnyAsync(diagram => diagram.ProjectId == kept.Id));
-			Assert.True(await DbContext.SavedScenarios.AnyAsync(scenario => scenario.ProjectId == kept.Id));
 		}
 
 		[Fact]

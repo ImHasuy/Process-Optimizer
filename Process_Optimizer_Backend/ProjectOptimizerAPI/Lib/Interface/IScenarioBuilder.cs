@@ -7,6 +7,5 @@ namespace ProjectOptimizerAPI.Lib.Interface
 	{
 		ScenarioComputation Build(ProcessGraph graph, ScenarioSelection selection);
 		ScenarioDTO ToDto(ScenarioComputation computation, ProjectContext context, long count);
-		ScenarioListItemDTO ToListItem(ScenarioComputation computation);
 	}
 }

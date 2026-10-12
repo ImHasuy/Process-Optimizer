@@ -6,6 +6,5 @@ namespace ProjectOptimizerAPI.Lib.Interface
 	{
 		Task<AnalyzedDiagram> GetOptimizableDiagramAsync(Guid projectId);
 		Task<IndexedDiagram> GetIndexedDiagramAsync(Guid projectId);
-		Task<Func<string, long?>> CreateRankerAsync(Guid projectId);
 	}
 }

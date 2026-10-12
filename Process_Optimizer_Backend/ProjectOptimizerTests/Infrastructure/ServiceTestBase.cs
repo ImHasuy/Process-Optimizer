@@ -27,12 +27,11 @@ namespace ProjectOptimizerTests.Infrastructure
 			UnitOfWork = new UnitOfWork(
 				DbContext,
 				new ProjectRepository(DbContext),
-				new DiagramRepository(DbContext),
-				new SavedScenarioRepository(DbContext));
+				new DiagramRepository(DbContext));
 			Analysis = AnalysisTestComponents.Create();
 			ProjectAccessGuard = new ProjectAccessGuard(UnitOfWork);
 			DiagramResolver = new DiagramResolver(UnitOfWork, ProjectAccessGuard);
-			ScenarioCatalog = new ScenarioCatalog(DiagramResolver, Analysis.Analyzer, Analysis.Indexer);
+			ScenarioCatalog = new ScenarioCatalog(DiagramResolver, Analysis.Analyzer);
 			TestData = new TestDataBuilder(DbContext, FixedNow.UtcDateTime, Analysis.DiagramFactory);
 		}
 

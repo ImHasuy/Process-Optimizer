@@ -7,7 +7,6 @@ Base URL: `http://localhost:5212`. JSON in, JSON out.
 | [ProjectController](ProjectController.md) | `/api/projects` |
 | [DiagramController](DiagramController.md) | `/api/projects/{projectId}/diagram` |
 | [ScenarioController](ScenarioController.md) | `/api/projects/{projectId}/scenario-count`, `/scenarios`, `/resource-limits` |
-| [SavedScenarioController](SavedScenarioController.md) | `/api/projects/{projectId}/saved-scenarios` |
 
 Every response is wrapped (the examples in these files show only `data`):
 
@@ -24,5 +23,5 @@ Error:
 | Status | When |
 |---|---|
 | 400 | invalid body or query |
-| 404 | unknown project, scenario index or saved scenario |
-| 409 | duplicate name, diagram has errors or too many scenarios |
+| 404 | unknown project or scenario index |
+| 409 | duplicate name, diagram has errors, too many scenarios |

@@ -59,7 +59,7 @@ namespace ProjectOptimizerAPI.Controllers
 			return NoContent();
 		}
 
-		/// <summary>Deletes a project together with its diagram and saved scenarios.</summary>
+		/// <summary>Deletes a project together with its diagram.</summary>
 		/// <param name="id">The identifier of the project.</param>
 		/// <returns>No content.</returns>
 		/// <response code="204">The project was deleted.</response>

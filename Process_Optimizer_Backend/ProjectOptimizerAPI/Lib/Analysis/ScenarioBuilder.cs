@@ -42,17 +42,6 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 				Currency = context.Currency
 			};
 
-		public ScenarioListItemDTO ToListItem(ScenarioComputation computation) =>
-			new()
-			{
-				Index = computation.Selection.Index,
-				Key = computation.Selection.Key,
-				Choices = ToChoiceDtos(computation.Selection.Choices),
-				ActivityCount = computation.Activities.Count,
-				TotalDuration = computation.TotalDuration,
-				TotalCost = computation.TotalCost
-			};
-
 		private ScenarioComputation CreateComputation(ScenarioSelection selection, IReadOnlyList<FlowNode> orderedNodes, IReadOnlyList<SequenceFlowEdge> scenarioEdges)
 		{
 			var criticalPath = criticalPathCalculator.Calculate(orderedNodes, scenarioEdges);

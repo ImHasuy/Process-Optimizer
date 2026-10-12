@@ -314,22 +314,6 @@ namespace ProjectOptimizerTests.Unit.Analysis
 			Assert.Equal(computation.CriticalPath, dto.CriticalPath);
 		}
 
-		[Fact]
-		public void ToListItem_CountsActivities()
-		{
-			var computation = BuildWorkedExample(1);
-
-			var item = _builder.ToListItem(computation);
-
-			Assert.Equal(1, item.Index);
-			Assert.Equal("G3=F", item.Key);
-			Assert.Equal(5, item.ActivityCount);
-			Assert.Equal(20m, item.TotalDuration);
-			Assert.Equal(25000m, item.TotalCost);
-			Assert.Equal("G3", Assert.Single(item.Choices).GatewayId);
-		}
-
-
 		private ScenarioComputation BuildWithoutChoices(string bpmnXml) => _builder.Build(_components.Parser.Parse(bpmnXml), NoChoices());
 
 		private ScenarioComputation BuildWorkedExample(long index)
@@ -342,8 +326,16 @@ namespace ProjectOptimizerTests.Unit.Analysis
 		private ScenarioSelection Selection(ProcessGraph graph, string key)
 		{
 			var root = StructureOf(graph);
-			var index = _components.Indexer.Rank(root, key) ?? throw new InvalidOperationException("The test key does not resolve.");
-			return _components.Indexer.Unrank(root, index);
+			for (var index = 0L; index < (long)root.Count; index++)
+			{
+				var selection = _components.Indexer.Unrank(root, index);
+				if (selection.Key == key)
+				{
+					return selection;
+				}
+			}
+
+			throw new InvalidOperationException("The test key does not resolve.");
 		}
 
 		private StructureFragment StructureOf(ProcessGraph graph) =>
