@@ -8,15 +8,15 @@ namespace ProjectOptimizerAPI.Controllers
 	public sealed class ProjectController(IProjectService projectService) : ApiControllerBase
 	{
 		/// <summary>Lists all projects, the most recently updated first.</summary>
-		/// <returns>The projects with the summary of their latest diagram revision.</returns>
+		/// <returns>The projects with the summary of their diagram.</returns>
 		/// <response code="200">The list of projects, possibly empty.</response>
 		[HttpGet]
 		[ProducesResponseType(typeof(ApiResponse<List<ProjectListItemDTO>>), StatusCodes.Status200OK)]
 		public async Task<IActionResult> ListProjects() => Success(await projectService.ListProjectsAsync());
 
-		/// <summary>Creates a project together with revision 1 holding the default diagram.</summary>
+		/// <summary>Creates a project with the default diagram.</summary>
 		/// <param name="request">The name (required, unique ignoring case and surrounding spaces), optional description, time unit (default Days) and currency (default EUR).</param>
-		/// <returns>The created project with its latest revision summary.</returns>
+		/// <returns>The created project with its diagram summary.</returns>
 		/// <response code="201">The project was created; the Location header points to it.</response>
 		/// <response code="400">The request body is invalid.</response>
 		/// <response code="409">A project with this name already exists.</response>
@@ -30,7 +30,7 @@ namespace ProjectOptimizerAPI.Controllers
 			return Created(nameof(GetProject), new { id = project.Id }, project);
 		}
 
-		/// <summary>Returns one project with the summary of its latest diagram revision.</summary>
+		/// <summary>Returns one project with the summary of its diagram.</summary>
 		/// <param name="id">The identifier of the project.</param>
 		/// <returns>The requested project.</returns>
 		/// <response code="200">The project was found.</response>
@@ -59,7 +59,7 @@ namespace ProjectOptimizerAPI.Controllers
 			return NoContent();
 		}
 
-		/// <summary>Deletes a project together with all its diagram revisions and saved scenarios.</summary>
+		/// <summary>Deletes a project together with its diagram and saved scenarios.</summary>
 		/// <param name="id">The identifier of the project.</param>
 		/// <returns>No content.</returns>
 		/// <response code="204">The project was deleted.</response>

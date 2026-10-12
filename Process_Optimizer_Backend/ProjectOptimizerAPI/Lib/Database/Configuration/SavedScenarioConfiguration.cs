@@ -17,7 +17,6 @@ namespace ProjectOptimizerAPI.Lib.Database.Configuration
 			builder.Property(savedScenario => savedScenario.ScenarioKey).IsRequired().HasMaxLength(2000);
 			builder.Property(savedScenario => savedScenario.SnapshotJson).IsRequired();
 			builder.HasIndex(savedScenario => new { savedScenario.ProjectId, savedScenario.NormalizedName }).IsUnique();
-			builder.HasIndex(savedScenario => new { savedScenario.ProjectId, savedScenario.RevisionNumber });
 
 			builder.HasOne(savedScenario => savedScenario.Project)
 				.WithMany(project => project.SavedScenarios)

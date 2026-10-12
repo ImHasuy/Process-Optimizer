@@ -6,7 +6,6 @@ namespace ProjectOptimizerTests.Infrastructure
 	{
 		public const string FrontendReadmeExportJson = """
 {
-  "baseRevision": 1,
   "states": [
     { "id": "StartEvent_1", "name": "Start", "type": "bpmn:StartEvent", "time": "", "price": "", "Depends_on": [], "Connects_to": ["Activity_1"] },
     { "id": "Activity_1", "name": "Sample Task", "type": "bpmn:Task", "time": "15m", "price": "25 EUR", "Depends_on": ["StartEvent_1"], "Connects_to": ["EndEvent_1"] },

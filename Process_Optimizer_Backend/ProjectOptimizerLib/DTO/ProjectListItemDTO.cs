@@ -8,7 +8,6 @@ namespace ProjectOptimizerLib.DTO
 		public string Name { get; init; } = string.Empty;
 		public ETimeUnit TimeUnit { get; init; }
 		public string Currency { get; init; } = string.Empty;
-		public int LatestRevisionNumber { get; init; }
 		public bool IsOptimizable { get; init; }
 		public decimal? MaxCost { get; init; }
 		public decimal? MaxDurationBound { get; init; }

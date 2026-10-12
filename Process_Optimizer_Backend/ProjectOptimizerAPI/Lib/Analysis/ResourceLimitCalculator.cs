@@ -14,7 +14,7 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 
 		private static Metric FirstScenario => new(_ => 0m, IsMaximum: false, IsParallelSum: true);
 
-		public ResourceLimitsDTO Calculate(ProcessGraph graph, StructureFragment root, EResourceLimitBasis basis, RevisionContext context)
+		public ResourceLimitsDTO Calculate(ProcessGraph graph, StructureFragment root, EResourceLimitBasis basis, ProjectContext context)
 		{
 			var leaves = new LeafValues(graph, basis);
 			var limits = EvaluateLimits(root, leaves);
@@ -39,7 +39,6 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 		private static ResourceLimitsDTO ToDto(Limits limits, LimitContext limitContext) => new()
 		{
 			ProjectId = limitContext.Context.ProjectId,
-			RevisionNumber = limitContext.Context.RevisionNumber,
 			Basis = limitContext.Basis,
 			TimeUnit = limitContext.Context.TimeUnit,
 			Currency = limitContext.Context.Currency,
@@ -279,7 +278,7 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 		private sealed record JointValue(decimal Cost, decimal Duration);
 
 		private sealed record LimitContext(
-			RevisionContext Context,
+			ProjectContext Context,
 			EResourceLimitBasis Basis,
 			BigInteger ScenarioCount,
 			bool HasExclusiveActivities,

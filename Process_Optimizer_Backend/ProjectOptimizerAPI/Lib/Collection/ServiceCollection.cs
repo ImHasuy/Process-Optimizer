@@ -87,7 +87,7 @@ namespace ProjectOptimizerAPI.Lib.Collection
 			services.AddSingleton<IScenarioBuilder, ScenarioBuilder>();
 			services.AddSingleton<IResourceLimitCalculator, ResourceLimitCalculator>();
 			services.AddSingleton<IDiagramAnalyzer, DiagramAnalyzer>();
-			services.AddSingleton<IDiagramRevisionFactory, DiagramRevisionFactory>();
+			services.AddSingleton<IDiagramFactory, DiagramFactory>();
 			services.AddSingleton<IProcessJsonConverter, ProcessJsonConverter>();
 			return services;
 		}
@@ -97,12 +97,12 @@ namespace ProjectOptimizerAPI.Lib.Collection
 			services.AddSingleton(TimeProvider.System);
 
 			services.AddScoped<IProjectRepository, ProjectRepository>();
-			services.AddScoped<IDiagramRevisionRepository, DiagramRevisionRepository>();
+			services.AddScoped<IDiagramRepository, DiagramRepository>();
 			services.AddScoped<ISavedScenarioRepository, SavedScenarioRepository>();
 			services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 			services.AddScoped<IProjectAccessGuard, ProjectAccessGuard>();
-			services.AddScoped<IRevisionResolver, RevisionResolver>();
+			services.AddScoped<IDiagramResolver, DiagramResolver>();
 			services.AddScoped<IScenarioCatalog, ScenarioCatalog>();
 
 			services.AddScoped<IProjectService, ProjectService>();

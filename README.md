@@ -18,5 +18,5 @@ cd Process_Optimizer_Backend && dotnet tool restore && dotnet run --project Proj
 cd Process_Optimizer_Frontend && npm install && npm run dev
 ```
 
-The frontend's JSON export is saved with `POST /api/projects/{projectId}/diagram/revisions/json`; see the backend
+The frontend's JSON export is saved with `PUT /api/projects/{projectId}/diagram/json` (it overwrites the diagram); see the backend
 README for the format and all endpoints.

@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectOptimizerAPI.Controllers;
 using ProjectOptimizerAPI.Lib.Analysis;
-using ProjectOptimizerAPI.Lib.Helper;
 using ProjectOptimizerLib.DTO;
 using ProjectOptimizerTests.Infrastructure;
 
@@ -14,41 +13,40 @@ namespace ProjectOptimizerTests.Integration.Controller
 {
 	public sealed class DiagramControllerTests(ApiWebApplicationFactory factory) : IClassFixture<ApiWebApplicationFactory>
 	{
-		private const string StaleRevisionMessage = "The diagram was changed by another session. Reload it before saving.";
 		private const string XmlContentType = "application/xml";
 		private const string AttachmentDisposition = "attachment";
 
 		private readonly HttpClient _client = factory.CreateClient();
 
 		[Fact]
-		public async Task GetLatestDiagram_NewProject_ReturnsRevisionOneWithDefaultXml()
+		public async Task GetDiagram_NewProject_ReturnsDefaultXml()
 		{
 			var project = await _client.CreateProjectAsync();
 
 			var response = await _client.GetAsync(DiagramUrl(project.Id));
 
 			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-			var body = await response.ReadApiResponseAsync<DiagramRevisionDTO>();
+			var body = await response.ReadApiResponseAsync<DiagramDTO>();
 			Assert.Equal((int)HttpStatusCode.OK, body.StatusCode);
-			Assert.Equal(1, body.Data!.RevisionNumber);
-			Assert.Equal(DefaultDiagram.Xml, body.Data.BpmnXml);
+			Assert.Equal(DefaultDiagram.Xml, body.Data!.BpmnXml);
+			Assert.Equal(project.CreatedAt, body.Data.UpdatedAt);
 		}
 
 		[Fact]
-		public async Task GetLatestDiagram_AfterSave_ReturnsSavedRevision()
+		public async Task GetDiagram_AfterSave_ReturnsSavedDiagram()
 		{
 			var project = await _client.CreateProjectAsync();
-			await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample, 1);
+			await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample);
 
 			var response = await _client.GetAsync(DiagramUrl(project.Id));
 
-			var latest = (await response.ReadApiResponseAsync<DiagramRevisionDTO>()).Data!;
-			Assert.Equal(2, latest.RevisionNumber);
-			Assert.Equal(BpmnFixtures.WorkedExample, latest.BpmnXml);
+			var diagram = (await response.ReadApiResponseAsync<DiagramDTO>()).Data!;
+			Assert.Equal(BpmnFixtures.WorkedExample, diagram.BpmnXml);
+			Assert.Equal(12, diagram.FlowNodeCount);
 		}
 
 		[Fact]
-		public async Task GetLatestDiagram_UnknownProject_ReturnsNotFoundEnvelope()
+		public async Task GetDiagram_UnknownProject_ReturnsNotFoundEnvelope()
 		{
 			var response = await _client.GetAsync(DiagramUrl(Guid.NewGuid()));
 
@@ -56,32 +54,31 @@ namespace ProjectOptimizerTests.Integration.Controller
 		}
 
 		[Fact]
-		public async Task SaveDiagram_ValidBody_ReturnsCreatedWithLocationToRevision()
+		public async Task SaveDiagram_ValidBody_ReturnsOkWithDiagram()
 		{
 			var project = await _client.CreateProjectAsync();
 
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), SaveRequest(BpmnFixtures.WorkedExample, 1));
+			var response = await _client.PutAsJsonAsync(DiagramUrl(project.Id), SaveRequest(BpmnFixtures.WorkedExample));
 
-			Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-			var body = await response.ReadApiResponseAsync<DiagramRevisionDTO>();
-			Assert.Equal((int)HttpStatusCode.Created, body.StatusCode);
-			Assert.Equal(2, body.Data!.RevisionNumber);
-			Assert.NotNull(response.Headers.Location);
-			Assert.EndsWith(RevisionUrl(project.Id, 2), response.Headers.Location!.ToString(), StringComparison.OrdinalIgnoreCase);
+			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+			var body = await response.ReadApiResponseAsync<DiagramDTO>();
+			Assert.Equal((int)HttpStatusCode.OK, body.StatusCode);
+			Assert.Equal(BpmnFixtures.WorkedExample, body.Data!.BpmnXml);
 		}
 
 		[Fact]
-		public async Task SaveDiagram_LocationHeader_ReturnsSavedRevision()
+		public async Task SaveDiagram_SecondSave_OverwritesDiagram()
 		{
 			var project = await _client.CreateProjectAsync();
-			var saveResponse = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), SaveRequest(BpmnFixtures.WorkedExample, 1));
+			await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample);
 
-			var response = await _client.GetAsync(saveResponse.Headers.Location);
+			var saved = await _client.SaveDiagramAsync(project.Id, BpmnFixtures.DisconnectedDiagram());
 
-			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-			var revision = (await response.ReadApiResponseAsync<DiagramRevisionDTO>()).Data!;
-			Assert.Equal(2, revision.RevisionNumber);
-			Assert.Equal(BpmnFixtures.WorkedExample, revision.BpmnXml);
+			var current = (await (await _client.GetAsync(DiagramUrl(project.Id))).ReadApiResponseAsync<DiagramDTO>()).Data!;
+			Assert.Equal(BpmnFixtures.DisconnectedDiagram(), current.BpmnXml);
+			Assert.Equal(saved.ContentSha256, current.ContentSha256);
+			Assert.Equal(3, current.FlowNodeCount);
+			Assert.False(current.IsOptimizable);
 		}
 
 		[Fact]
@@ -89,44 +86,24 @@ namespace ProjectOptimizerTests.Integration.Controller
 		{
 			var project = await _client.CreateProjectAsync();
 
-			var revision = await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample, 1);
+			var diagram = await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample);
 
-			Assert.True(revision.IsOptimizable);
-			Assert.Equal(0, revision.ErrorCount);
-			Assert.Equal(12, revision.FlowNodeCount);
-			Assert.Equal(Encoding.UTF8.GetByteCount(BpmnFixtures.WorkedExample), revision.SizeBytes);
-			Assert.False(string.IsNullOrEmpty(revision.ContentSha256));
+			Assert.True(diagram.IsOptimizable);
+			Assert.Equal(0, diagram.ErrorCount);
+			Assert.Equal(12, diagram.FlowNodeCount);
+			Assert.Equal(Encoding.UTF8.GetByteCount(BpmnFixtures.WorkedExample), diagram.SizeBytes);
+			Assert.False(string.IsNullOrEmpty(diagram.ContentSha256));
 		}
 
 		[Fact]
-		public async Task SaveDiagram_SemanticErrors_ReturnsCreatedWithErrorCount()
+		public async Task SaveDiagram_SemanticErrors_ReturnsOkWithErrorCount()
 		{
 			var project = await _client.CreateProjectAsync();
 
-			var revision = await _client.SaveDiagramAsync(project.Id, BpmnFixtures.DisconnectedDiagram(), 1);
+			var diagram = await _client.SaveDiagramAsync(project.Id, BpmnFixtures.DisconnectedDiagram());
 
-			Assert.True(revision.ErrorCount > 0);
-			Assert.False(revision.IsOptimizable);
-		}
-
-		[Fact]
-		public async Task SaveDiagram_MissingBaseRevision_ReturnsBadRequest()
-		{
-			var project = await _client.CreateProjectAsync();
-
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), new { BpmnXml = DefaultDiagram.Xml });
-
-			await response.AssertValidationErrorAsync(nameof(DiagramRevisionCreateDTO.BaseRevision));
-		}
-
-		[Fact]
-		public async Task SaveDiagram_ZeroBaseRevision_ReturnsBadRequest()
-		{
-			var project = await _client.CreateProjectAsync();
-
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), SaveRequest(DefaultDiagram.Xml, 0));
-
-			await response.AssertValidationErrorAsync(nameof(DiagramRevisionCreateDTO.BaseRevision));
+			Assert.True(diagram.ErrorCount > 0);
+			Assert.False(diagram.IsOptimizable);
 		}
 
 		[Fact]
@@ -134,19 +111,22 @@ namespace ProjectOptimizerTests.Integration.Controller
 		{
 			var project = await _client.CreateProjectAsync();
 
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), SaveRequest(string.Empty, 1));
+			var response = await _client.PutAsJsonAsync(DiagramUrl(project.Id), SaveRequest(string.Empty));
 
-			await response.AssertValidationErrorAsync(nameof(DiagramRevisionCreateDTO.BpmnXml));
+			await response.AssertValidationErrorAsync(nameof(DiagramSaveDTO.BpmnXml));
 		}
 
 		[Fact]
-		public async Task SaveDiagram_MalformedXml_ReturnsBadRequest()
+		public async Task SaveDiagram_MalformedXml_ReturnsBadRequestAndKeepsDiagram()
 		{
 			var project = await _client.CreateProjectAsync();
+			await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample);
 
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), SaveRequest("<bpmn:definitions", 1));
+			var response = await _client.PutAsJsonAsync(DiagramUrl(project.Id), SaveRequest("<bpmn:definitions"));
 
 			await response.AssertApiErrorAsync(HttpStatusCode.BadRequest);
+			var current = (await (await _client.GetAsync(DiagramUrl(project.Id))).ReadApiResponseAsync<DiagramDTO>()).Data!;
+			Assert.Equal(BpmnFixtures.WorkedExample, current.BpmnXml);
 		}
 
 		[Fact]
@@ -154,7 +134,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 		{
 			var project = await _client.CreateProjectAsync();
 
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), SaveRequest(BpmnFixtures.Load("Parsing/xxe.bpmn"), 1));
+			var response = await _client.PutAsJsonAsync(DiagramUrl(project.Id), SaveRequest(BpmnFixtures.Load("Parsing/xxe.bpmn")));
 
 			await response.AssertApiErrorAsync(HttpStatusCode.BadRequest);
 		}
@@ -164,7 +144,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 		{
 			var project = await _client.CreateProjectAsync();
 
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), SaveRequest(BpmnFixtures.Load("Parsing/billion-laughs.bpmn"), 1));
+			var response = await _client.PutAsJsonAsync(DiagramUrl(project.Id), SaveRequest(BpmnFixtures.Load("Parsing/billion-laughs.bpmn")));
 
 			await response.AssertApiErrorAsync(HttpStatusCode.BadRequest);
 		}
@@ -174,7 +154,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 		{
 			var project = await _client.CreateProjectAsync();
 
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), SaveRequest(PaddedXml(AnalysisLimits.MaxXmlBytes), 1));
+			var response = await _client.PutAsJsonAsync(DiagramUrl(project.Id), SaveRequest(PaddedXml(AnalysisLimits.MaxXmlBytes)));
 
 			await response.AssertApiErrorAsync(HttpStatusCode.BadRequest);
 		}
@@ -190,76 +170,9 @@ namespace ProjectOptimizerTests.Integration.Controller
 		}
 
 		[Fact]
-		public async Task SaveDiagram_StaleBaseRevision_ReturnsConflict()
-		{
-			var project = await _client.CreateProjectAsync();
-			await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample, 1);
-
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(project.Id), SaveRequest(DefaultDiagram.Xml, 1));
-
-			var body = await response.AssertApiErrorAsync(HttpStatusCode.Conflict);
-			Assert.Equal(StaleRevisionMessage, body.Message);
-		}
-
-		[Fact]
 		public async Task SaveDiagram_UnknownProject_ReturnsNotFound()
 		{
-			var response = await _client.PostAsJsonAsync(RevisionsUrl(Guid.NewGuid()), SaveRequest(DefaultDiagram.Xml, 1));
-
-			await response.AssertApiErrorAsync(HttpStatusCode.NotFound);
-		}
-
-		[Fact]
-		public async Task ListRevisions_AfterSave_ReturnsNewestFirst()
-		{
-			var project = await _client.CreateProjectAsync();
-			await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample, 1);
-
-			var response = await _client.GetAsync(RevisionsUrl(project.Id));
-
-			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-			var body = await response.ReadApiResponseAsync<List<DiagramRevisionListItemDTO>>();
-			Assert.Equal((int)HttpStatusCode.OK, body.StatusCode);
-			Assert.Equal(new[] { 2, 1 }, body.Data!.Select(revision => revision.RevisionNumber));
-		}
-
-		[Fact]
-		public async Task ListRevisions_UnknownProject_ReturnsNotFound()
-		{
-			var response = await _client.GetAsync(RevisionsUrl(Guid.NewGuid()));
-
-			await response.AssertApiErrorAsync(HttpStatusCode.NotFound);
-		}
-
-		[Fact]
-		public async Task GetRevision_ExistingNumber_ReturnsRevision()
-		{
-			var project = await _client.CreateProjectAsync();
-			await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample, 1);
-
-			var response = await _client.GetAsync(RevisionUrl(project.Id, 1));
-
-			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-			var revision = (await response.ReadApiResponseAsync<DiagramRevisionDTO>()).Data!;
-			Assert.Equal(1, revision.RevisionNumber);
-			Assert.Equal(DefaultDiagram.Xml, revision.BpmnXml);
-		}
-
-		[Fact]
-		public async Task GetRevision_UnknownNumber_ReturnsNotFound()
-		{
-			var project = await _client.CreateProjectAsync();
-
-			var response = await _client.GetAsync(RevisionUrl(project.Id, 99));
-
-			var body = await response.AssertApiErrorAsync(HttpStatusCode.NotFound);
-			Assert.Equal(ErrorMessages.RevisionNotFound, body.Message);
-		}
-
-		[Fact]
-		public async Task GetRevision_UnknownProject_ReturnsNotFound()
-		{
-			var response = await _client.GetAsync(RevisionUrl(Guid.NewGuid(), 1));
+			var response = await _client.PutAsJsonAsync(DiagramUrl(Guid.NewGuid()), SaveRequest(DefaultDiagram.Xml));
 
 			await response.AssertApiErrorAsync(HttpStatusCode.NotFound);
 		}
@@ -269,7 +182,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 		{
 			var projectName = $"Download-{Guid.NewGuid():N}";
 			var project = await _client.CreateProjectAsync(projectName);
-			await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample, 1);
+			await _client.SaveDiagramAsync(project.Id, BpmnFixtures.WorkedExample);
 
 			var response = await _client.GetAsync(FileUrl(project.Id));
 
@@ -291,13 +204,9 @@ namespace ProjectOptimizerTests.Integration.Controller
 
 		private static string DiagramUrl(Guid projectId) => $"/api/projects/{projectId}/diagram";
 
-		private static string RevisionsUrl(Guid projectId) => $"{DiagramUrl(projectId)}/revisions";
-
-		private static string RevisionUrl(Guid projectId, int revisionNumber) => $"{RevisionsUrl(projectId)}/{revisionNumber}";
-
 		private static string FileUrl(Guid projectId) => $"{DiagramUrl(projectId)}/file";
 
-		private static object SaveRequest(string bpmnXml, int baseRevision) => new { BpmnXml = bpmnXml, BaseRevision = baseRevision };
+		private static object SaveRequest(string bpmnXml) => new { BpmnXml = bpmnXml };
 
 		private static string PaddedXml(int minimumBytes) =>
 			DefaultDiagram.Xml + $"<!--{new string('x', minimumBytes)}-->";

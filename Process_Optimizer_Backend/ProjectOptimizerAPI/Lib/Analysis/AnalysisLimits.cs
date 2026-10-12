@@ -12,7 +12,6 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 		public const int MaxInclusiveBranches = 10;
 		public const int MinBranchingFlows = 2;
 		public const int OrderingVersion = 1;
-		public const int RevisionsToKeep = 50;
 		public const int MaxSaveRequestBytes = 3 * 1024 * 1024;
 		public const long MaxPathCount = MaxSafeInteger;
 

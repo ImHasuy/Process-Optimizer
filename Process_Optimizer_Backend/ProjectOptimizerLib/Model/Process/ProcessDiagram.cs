@@ -8,11 +8,14 @@ namespace ProjectOptimizerLib.Model.Process
 	{
 		private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
+		private List<ProcessState> _states = [];
+		private List<ProcessBranch> _branches = [];
+
 		[JsonPropertyName("states")]
-		public List<ProcessState> States { get; set; } = [];
+		public List<ProcessState> States { get => _states; set => _states = value ?? []; }
 
 		[JsonPropertyName("branches")]
-		public List<ProcessBranch> Branches { get; set; } = [];
+		public List<ProcessBranch> Branches { get => _branches; set => _branches = value ?? []; }
 
 		public static ProcessDiagram Parse(string json) =>
 			JsonSerializer.Deserialize<ProcessDiagram>(json, SerializerOptions) ?? throw new JsonException("The process diagram JSON is empty.");

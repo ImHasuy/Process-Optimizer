@@ -19,11 +19,10 @@ namespace ProjectOptimizerAPI.Lib.Analysis
 			return CreateComputation(selection, orderedNodes, scenarioEdges);
 		}
 
-		public ScenarioDTO ToDto(ScenarioComputation computation, RevisionContext context, long count) =>
+		public ScenarioDTO ToDto(ScenarioComputation computation, ProjectContext context, long count) =>
 			new()
 			{
 				ProjectId = context.ProjectId,
-				RevisionNumber = context.RevisionNumber,
 				OrderingVersion = AnalysisLimits.OrderingVersion,
 				Index = computation.Selection.Index,
 				Count = count,

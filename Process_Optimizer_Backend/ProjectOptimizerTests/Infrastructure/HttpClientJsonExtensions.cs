@@ -33,11 +33,15 @@ namespace ProjectOptimizerTests.Infrastructure
 		public static async Task<Guid> CreateProjectWithDiagramAsync(this HttpClient client, string bpmnXml)
 		{
 			var project = await client.CreateProjectAsync();
-			await client.SaveDiagramAsync(project.Id, bpmnXml, project.LatestRevision.RevisionNumber);
+			await client.SaveDiagramAsync(project.Id, bpmnXml);
 			return project.Id;
 		}
 
-		public static Task<DiagramRevisionDTO> SaveDiagramAsync(this HttpClient client, Guid projectId, string bpmnXml, int baseRevision) =>
-			client.PostAndReadDataAsync<DiagramRevisionDTO>($"{ProjectsUrl}/{projectId}/diagram/revisions", new { BpmnXml = bpmnXml, BaseRevision = baseRevision });
+		public static async Task<DiagramDTO> SaveDiagramAsync(this HttpClient client, Guid projectId, string bpmnXml)
+		{
+			var response = await client.PutAsJsonAsync($"{ProjectsUrl}/{projectId}/diagram", new { BpmnXml = bpmnXml }, SerializerOptions);
+			response.EnsureSuccessStatusCode();
+			return (await response.ReadApiResponseAsync<DiagramDTO>()).Data!;
+		}
 	}
 }

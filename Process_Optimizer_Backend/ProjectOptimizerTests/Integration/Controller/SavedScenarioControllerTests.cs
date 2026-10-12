@@ -40,11 +40,10 @@ namespace ProjectOptimizerTests.Integration.Controller
 			var saved = body.Data!;
 			Assert.Equal(name, saved.Name);
 			Assert.Equal("Worth keeping", saved.Note);
-			Assert.Equal(2, saved.RevisionNumber);
 			Assert.Equal(1, saved.ScenarioIndex);
 			Assert.Equal(saved.ScenarioKey, saved.Snapshot.Key);
-			Assert.True(saved.IsAvailableInLatestRevision);
-			Assert.Equal(1, saved.LatestRevisionIndex);
+			Assert.True(saved.IsAvailable);
+			Assert.Equal(1, saved.CurrentIndex);
 			Assert.NotNull(response.Headers.Location);
 			Assert.EndsWith(SavedScenarioUrl(projectId, saved.Id), response.Headers.Location!.ToString(), StringComparison.OrdinalIgnoreCase);
 		}
@@ -105,17 +104,6 @@ namespace ProjectOptimizerTests.Integration.Controller
 
 			Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 			Assert.Contains(nameof(SavedScenarioCreateDTO.ScenarioIndex), (await response.ReadApiErrorAsync()).Errors!.Keys);
-		}
-
-		[Fact]
-		public async Task CreateSavedScenario_ZeroRevision_ReturnsBadRequest()
-		{
-			var projectId = await _client.CreateProjectWithDiagramAsync(TwoScenarioDiagram);
-
-			var response = await _client.PostAsJsonAsync(SavedScenariosUrl(projectId), new { ScenarioIndex = 0, Revision = 0, Name = UniqueName() });
-
-			Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-			Assert.Contains(nameof(SavedScenarioCreateDTO.Revision), (await response.ReadApiErrorAsync()).Errors!.Keys);
 		}
 
 		[Fact]
@@ -185,7 +173,21 @@ namespace ProjectOptimizerTests.Integration.Controller
 			var body = await response.ReadApiResponseAsync<List<SavedScenarioListItemDTO>>();
 			Assert.Equal((int)HttpStatusCode.OK, body.StatusCode);
 			Assert.Equal([second.Id, first.Id], body.Data!.Select(item => item.Id));
-			Assert.All(body.Data!, item => Assert.True(item.IsAvailableInLatestRevision));
+			Assert.All(body.Data!, item => Assert.True(item.IsAvailable));
+		}
+
+		[Fact]
+		public async Task ListSavedScenarios_DiagramOverwrittenWithoutKey_ReportsUnavailable()
+		{
+			var projectId = await _client.CreateProjectWithDiagramAsync(TwoScenarioDiagram);
+			var saved = await CreateSavedScenarioAsync(projectId, UniqueName(), 1);
+			await _client.SaveDiagramAsync(projectId, BpmnFixtures.WorkedExample);
+
+			var response = await _client.GetAsync(SavedScenariosUrl(projectId));
+
+			var item = Assert.Single((await response.ReadApiResponseAsync<List<SavedScenarioListItemDTO>>()).Data!);
+			Assert.Equal(saved.Id, item.Id);
+			Assert.False(item.IsAvailable);
 		}
 
 		[Fact]
@@ -210,6 +212,23 @@ namespace ProjectOptimizerTests.Integration.Controller
 			Assert.Equal(saved.Name, result.Name);
 			Assert.Equal(saved.ScenarioKey, result.Snapshot.Key);
 			Assert.Equal(projectId, result.Snapshot.ProjectId);
+		}
+
+		[Fact]
+		public async Task GetSavedScenario_DiagramOverwrittenWithoutKey_ReportsUnavailableWithSnapshot()
+		{
+			var projectId = await _client.CreateProjectWithDiagramAsync(TwoScenarioDiagram);
+			var saved = await CreateSavedScenarioAsync(projectId, UniqueName(), 1);
+			await _client.SaveDiagramAsync(projectId, BpmnFixtures.WorkedExample);
+
+			var response = await _client.GetAsync(SavedScenarioUrl(projectId, saved.Id));
+
+			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+			var result = (await response.ReadApiResponseAsync<SavedScenarioDTO>()).Data!;
+			Assert.False(result.IsAvailable);
+			Assert.Null(result.CurrentIndex);
+			Assert.Equal(saved.ScenarioKey, result.Snapshot.Key);
+			Assert.Equal(saved.Snapshot.TotalCost, result.Snapshot.TotalCost);
 		}
 
 		[Fact]

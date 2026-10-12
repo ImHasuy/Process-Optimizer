@@ -17,12 +17,6 @@ namespace ProjectOptimizerAPI.Lib.Repository
 				.ProjectToType<SavedScenarioListItemDTO>()
 				.ToListAsync();
 
-		public Task<List<int>> ListReferencedRevisionNumbersAsync(Guid projectId) =>
-			OfProject(projectId)
-				.Select(savedScenario => savedScenario.RevisionNumber)
-				.Distinct()
-				.ToListAsync();
-
 		public Task<SavedScenario?> FindForProjectAsync(Guid projectId, Guid id) =>
 			OfProject(projectId).FirstOrDefaultAsync(savedScenario => savedScenario.Id == id);
 

@@ -37,6 +37,15 @@ namespace ProjectOptimizerTests.Unit.Analysis
 			Assert.Equal(3, ProcessDiagram.Parse(json).States.Count);
 		}
 
+		[Fact]
+		public void Parse_NullStatesAndBranches_GivesEmptyLists()
+		{
+			var diagram = ProcessDiagram.Parse("""{ "states": null, "branches": null }""");
+
+			Assert.Empty(diagram.States);
+			Assert.Empty(diagram.Branches);
+		}
+
 		[Theory]
 		[InlineData("nor", true)]
 		[InlineData(" NOR ", true)]

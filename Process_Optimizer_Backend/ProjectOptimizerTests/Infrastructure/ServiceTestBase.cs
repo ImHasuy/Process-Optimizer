@@ -27,13 +27,13 @@ namespace ProjectOptimizerTests.Infrastructure
 			UnitOfWork = new UnitOfWork(
 				DbContext,
 				new ProjectRepository(DbContext),
-				new DiagramRevisionRepository(DbContext),
+				new DiagramRepository(DbContext),
 				new SavedScenarioRepository(DbContext));
 			Analysis = AnalysisTestComponents.Create();
 			ProjectAccessGuard = new ProjectAccessGuard(UnitOfWork);
-			RevisionResolver = new RevisionResolver(UnitOfWork, ProjectAccessGuard);
-			ScenarioCatalog = new ScenarioCatalog(RevisionResolver, Analysis.Analyzer, Analysis.Indexer);
-			TestData = new TestDataBuilder(DbContext, FixedNow.UtcDateTime, Analysis.RevisionFactory);
+			DiagramResolver = new DiagramResolver(UnitOfWork, ProjectAccessGuard);
+			ScenarioCatalog = new ScenarioCatalog(DiagramResolver, Analysis.Analyzer, Analysis.Indexer);
+			TestData = new TestDataBuilder(DbContext, FixedNow.UtcDateTime, Analysis.DiagramFactory);
 		}
 
 		protected ProjectOptimizerDbContext DbContext { get; }
@@ -41,11 +41,13 @@ namespace ProjectOptimizerTests.Infrastructure
 		protected FakeTimeProvider TimeProvider { get; } = new(FixedNow);
 		protected AnalysisTestComponents Analysis { get; }
 		protected IProjectAccessGuard ProjectAccessGuard { get; }
-		protected IRevisionResolver RevisionResolver { get; }
+		protected IDiagramResolver DiagramResolver { get; }
 		protected IScenarioCatalog ScenarioCatalog { get; }
 		protected TestDataBuilder TestData { get; }
 
 		protected Task<Project> LoadProjectAsync(Guid id) => DbContext.Projects.AsNoTracking().SingleAsync(project => project.Id == id);
+
+		protected Task<Diagram> LoadDiagramAsync(Guid projectId) => DbContext.Diagrams.AsNoTracking().SingleAsync(diagram => diagram.ProjectId == projectId);
 
 		public void Dispose()
 		{

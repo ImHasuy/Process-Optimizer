@@ -3,9 +3,9 @@
 @savedScenarioId = 00000000-0000-0000-0000-000000000000
 
 # Typical flow: create a project, copy its id into @projectId, save the frontend's JSON export
-# as revision 2, then read its scenarios and resource limits.
+# (it overwrites the project's diagram), then read its scenarios and resource limits.
 
-### Create project (gets revision 1 with the default diagram)
+### Create project (starts with the default diagram)
 POST {{ProjectOptimizerAPI_HostAddress}}/api/projects
 Content-Type: application/json
 
@@ -33,12 +33,11 @@ Content-Type: application/json
   "currency": "EUR"
 }
 
-### Save the frontend's JSON export as a new revision
-POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions/json
+### Save the frontend's JSON export (overwrites the diagram)
+PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/json
 Content-Type: application/json
 
 {
-  "baseRevision": 1,
   "states": [
     { "id": "Start", "name": "Start", "type": "bpmn:StartEvent", "time": "", "price": "", "Depends_on": [], "Connects_to": ["Split"] },
     { "id": "Split", "name": "Mover?", "type": "bpmn:ExclusiveGateway", "time": "", "price": "", "Depends_on": ["Start"], "Connects_to": ["Cheap", "Fast"] },
@@ -57,38 +56,23 @@ Content-Type: application/json
   ]
 }
 
-### Save a BPMN XML as a new revision (baseRevision must be the latest revision)
-POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions
-Content-Type: application/json
-
-{
-  "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" id=\"D\"><bpmn:process id=\"P\"><bpmn:startEvent id=\"S\" /><bpmn:task id=\"T\" name=\"Work\" xmlns:po=\"http://projectoptimizer.app/schema/bpmn/1.0\" po:duration=\"3\" po:cost=\"100\" /><bpmn:endEvent id=\"E\" /><bpmn:sequenceFlow id=\"F1\" sourceRef=\"S\" targetRef=\"T\" /><bpmn:sequenceFlow id=\"F2\" sourceRef=\"T\" targetRef=\"E\" /></bpmn:process></bpmn:definitions>",
-  "baseRevision": 2
-}
-
-### Get latest diagram
+### Get diagram
 GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram
 
-### List revisions
-GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions
-
-### Get revision
-GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/revisions/2
-
-### Download the latest diagram as a .bpmn file
+### Download the diagram as a .bpmn file
 GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/file
 
 ### Scenario count
-GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenario-count?revision=2
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenario-count
 
 ### List scenarios
-GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios?revision=2&page=1&pageSize=20
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios?page=1&pageSize=20
 
 ### Get scenario
-GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios/1?revision=2
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios/1
 
 ### Resource limits
-GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/resource-limits?revision=2&basis=Planned
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/resource-limits?basis=Planned
 
 ### Create saved scenario
 POST {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios
@@ -96,7 +80,6 @@ Content-Type: application/json
 
 {
   "scenarioIndex": 1,
-  "revision": 2,
   "name": "Fast mover",
   "note": "Faster but more expensive."
 }
@@ -118,6 +101,14 @@ Content-Type: application/json
 
 ### Delete saved scenario
 DELETE {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/saved-scenarios/{{savedScenarioId}}
+
+### Overwrite the diagram with a BPMN XML instead
+PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram
+Content-Type: application/json
+
+{
+  "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" id=\"D\"><bpmn:process id=\"P\"><bpmn:startEvent id=\"S\" /><bpmn:task id=\"T\" name=\"Work\" xmlns:po=\"http://projectoptimizer.app/schema/bpmn/1.0\" po:duration=\"3\" po:cost=\"100\" /><bpmn:endEvent id=\"E\" /><bpmn:sequenceFlow id=\"F1\" sourceRef=\"S\" targetRef=\"T\" /><bpmn:sequenceFlow id=\"F2\" sourceRef=\"T\" targetRef=\"E\" /></bpmn:process></bpmn:definitions>"
+}
 
 ### Delete project
 DELETE {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}

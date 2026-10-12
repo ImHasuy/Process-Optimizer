@@ -1,4 +1,3 @@
-using ProjectOptimizerAPI.Lib.Interface;
 using ProjectOptimizerLib.Enum;
 using ProjectOptimizerLib.Model;
 
@@ -20,11 +19,5 @@ namespace ProjectOptimizerAPI.Lib.Helper
 			CreatedAt = now,
 			UpdatedAt = now
 		};
-
-		public static void AddRevision(Project project, IDiagramRevisionFactory revisionFactory, string bpmnXml)
-		{
-			project.LatestRevisionNumber++;
-			project.Revisions.Add(revisionFactory.Create(project.Id, project.LatestRevisionNumber, bpmnXml, project.CreatedAt));
-		}
 	}
 }

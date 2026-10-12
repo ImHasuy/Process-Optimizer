@@ -5,7 +5,6 @@ namespace ProjectOptimizerLib.DTO
 	public sealed class ResourceLimitsDTO
 	{
 		public Guid ProjectId { get; init; }
-		public int RevisionNumber { get; init; }
 		public EResourceLimitBasis Basis { get; init; }
 		public ETimeUnit TimeUnit { get; init; }
 		public string Currency { get; init; } = string.Empty;

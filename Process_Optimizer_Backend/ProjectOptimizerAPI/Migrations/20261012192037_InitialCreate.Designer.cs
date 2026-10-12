@@ -11,7 +11,7 @@ using ProjectOptimizerAPI.Lib.Database;
 namespace ProjectOptimizerAPI.Migrations
 {
     [DbContext(typeof(ProjectOptimizerDbContext))]
-    [Migration("20261010184514_InitialCreate")]
+    [Migration("20261012192037_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -20,10 +20,9 @@ namespace ProjectOptimizerAPI.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.31");
 
-            modelBuilder.Entity("ProjectOptimizerLib.Model.DiagramRevision", b =>
+            modelBuilder.Entity("ProjectOptimizerLib.Model.Diagram", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<Guid>("ProjectId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("BpmnXml")
@@ -33,9 +32,6 @@ namespace ProjectOptimizerAPI.Migrations
                     b.Property<string>("ContentSha256")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("ErrorCount")
@@ -53,24 +49,18 @@ namespace ProjectOptimizerAPI.Migrations
                     b.Property<decimal?>("MaxDurationBound")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("RevisionNumber")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("SizeBytes")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("WarningCount")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey("ProjectId");
 
-                    b.HasIndex("ProjectId", "RevisionNumber")
-                        .IsUnique();
-
-                    b.ToTable("DiagramRevisions", (string)null);
+                    b.ToTable("Diagrams", (string)null);
                 });
 
             modelBuilder.Entity("ProjectOptimizerLib.Model.Project", b =>
@@ -90,9 +80,6 @@ namespace ProjectOptimizerAPI.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("LatestRevisionNumber")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -151,9 +138,6 @@ namespace ProjectOptimizerAPI.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("RevisionNumber")
-                        .HasColumnType("INTEGER");
-
                     b.Property<long>("ScenarioIndex")
                         .HasColumnType("INTEGER");
 
@@ -177,16 +161,14 @@ namespace ProjectOptimizerAPI.Migrations
                     b.HasIndex("ProjectId", "NormalizedName")
                         .IsUnique();
 
-                    b.HasIndex("ProjectId", "RevisionNumber");
-
                     b.ToTable("SavedScenarios", (string)null);
                 });
 
-            modelBuilder.Entity("ProjectOptimizerLib.Model.DiagramRevision", b =>
+            modelBuilder.Entity("ProjectOptimizerLib.Model.Diagram", b =>
                 {
                     b.HasOne("ProjectOptimizerLib.Model.Project", "Project")
-                        .WithMany("Revisions")
-                        .HasForeignKey("ProjectId")
+                        .WithOne("Diagram")
+                        .HasForeignKey("ProjectOptimizerLib.Model.Diagram", "ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -206,7 +188,8 @@ namespace ProjectOptimizerAPI.Migrations
 
             modelBuilder.Entity("ProjectOptimizerLib.Model.Project", b =>
                 {
-                    b.Navigation("Revisions");
+                    b.Navigation("Diagram")
+                        .IsRequired();
 
                     b.Navigation("SavedScenarios");
                 });

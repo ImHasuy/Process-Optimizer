@@ -7,20 +7,20 @@ namespace ProjectOptimizerAPI.Lib.Mapping
 {
 	public sealed class SavedScenarioMappingConfig : IRegister
 	{
-		public const string LatestRevisionIndexParameter = "latestRevisionIndex";
+		public const string CurrentIndexParameter = "currentIndex";
 
 		public void Register(TypeAdapterConfig config)
 		{
 			config.NewConfig<SavedScenario, SavedScenarioListItemDTO>()
-				.Ignore(destination => destination.IsAvailableInLatestRevision);
+				.Ignore(destination => destination.IsAvailable);
 
 			config.NewConfig<SavedScenario, SavedScenarioDTO>()
-				.Map(destination => destination.LatestRevisionIndex, source => LatestRevisionIndex())
-				.Map(destination => destination.IsAvailableInLatestRevision, source => LatestRevisionIndex().HasValue)
+				.Map(destination => destination.CurrentIndex, source => CurrentIndex())
+				.Map(destination => destination.IsAvailable, source => CurrentIndex().HasValue)
 				.Map(destination => destination.Snapshot, source => ScenarioSnapshotSerializer.Deserialize(source.SnapshotJson));
 		}
 
-		private static long? LatestRevisionIndex() =>
-			MapContext.Current?.Parameters.GetValueOrDefault(LatestRevisionIndexParameter) as long?;
+		private static long? CurrentIndex() =>
+			MapContext.Current?.Parameters.GetValueOrDefault(CurrentIndexParameter) as long?;
 	}
 }

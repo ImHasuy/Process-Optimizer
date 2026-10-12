@@ -4,14 +4,13 @@ using ProjectOptimizerAPI.Lib.Exceptions;
 using ProjectOptimizerAPI.Lib.Service;
 using ProjectOptimizerLib.DTO;
 using ProjectOptimizerLib.Enum;
-using ProjectOptimizerLib.Model;
 using ProjectOptimizerTests.Infrastructure;
 
 namespace ProjectOptimizerTests.Unit.Service
 {
 	public sealed class ProjectServiceTests : ServiceTestBase
 	{
-		private ProjectService CreateService() => new(UnitOfWork, ProjectAccessGuard, Analysis.RevisionFactory, TimeProvider);
+		private ProjectService CreateService() => new(UnitOfWork, ProjectAccessGuard, Analysis.DiagramFactory, TimeProvider);
 
 		private static ProjectCreateDTO CreateRequest(string name, string? description = null, ETimeUnit? timeUnit = null, string? currency = null) =>
 			new() { Name = name, Description = description, TimeUnit = timeUnit, Currency = currency };
@@ -32,20 +31,18 @@ namespace ProjectOptimizerTests.Unit.Service
 			return projects;
 		}
 
-		private Task<List<DiagramRevision>> LoadRevisionsAsync(Guid projectId) =>
-			DbContext.DiagramRevisions.AsNoTracking().Where(revision => revision.ProjectId == projectId).OrderBy(revision => revision.RevisionNumber).ToListAsync();
-
 		private static List<string> NamesOf(List<ProjectListItemDTO> result) => result.Select(item => item.Name).ToList();
 
 		[Fact]
-		public async Task CreateProjectAsync_ValidRequest_CreatesRevisionOneWithDefaultDiagram()
+		public async Task CreateProjectAsync_ValidRequest_CreatesDefaultDiagram()
 		{
 			var project = await CreateService().CreateProjectAsync(CreateRequest("Launch"));
 
-			var revision = Assert.Single(await LoadRevisionsAsync(project.Id));
-			Assert.Equal(1, revision.RevisionNumber);
-			Assert.Equal(DefaultDiagram.Xml, revision.BpmnXml);
-			Assert.Equal(1, project.LatestRevision.RevisionNumber);
+			var diagram = await LoadDiagramAsync(project.Id);
+			Assert.Equal(DefaultDiagram.Xml, diagram.BpmnXml);
+			Assert.Equal(FixedNow.UtcDateTime, diagram.UpdatedAt);
+			Assert.Equal(1, await DbContext.Diagrams.CountAsync());
+			Assert.Equal(diagram.FlowNodeCount, project.Diagram.FlowNodeCount);
 			Assert.Equal(FixedNow.UtcDateTime, project.CreatedAt);
 			Assert.Equal(FixedNow.UtcDateTime, project.UpdatedAt);
 		}
@@ -95,7 +92,7 @@ namespace ProjectOptimizerTests.Unit.Service
 			await Assert.ThrowsAsync<ConflictException>(() => CreateService().CreateProjectAsync(CreateRequest("launch")));
 
 			Assert.Equal(1, await DbContext.Projects.CountAsync());
-			Assert.Equal(1, await DbContext.DiagramRevisions.CountAsync());
+			Assert.Equal(1, await DbContext.Diagrams.CountAsync());
 		}
 
 		[Fact]
@@ -109,18 +106,17 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task ListProjectsAsync_OptimizableLatestRevision_IncludesStoredLimits()
+		public async Task ListProjectsAsync_OptimizableDiagram_IncludesStoredLimits()
 		{
 			var project = await TestData.AddProjectAsync("Worked example", BpmnFixtures.WorkedExample);
-			var revision = Assert.Single(await LoadRevisionsAsync(project.Id));
+			var diagram = await LoadDiagramAsync(project.Id);
 
 			var item = Assert.Single(await CreateService().ListProjectsAsync());
 
 			Assert.True(item.IsOptimizable);
 			Assert.NotNull(item.MaxCost);
-			Assert.Equal(revision.MaxCost, item.MaxCost);
-			Assert.Equal(revision.MaxDurationBound, item.MaxDurationBound);
-			Assert.Equal(1, item.LatestRevisionNumber);
+			Assert.Equal(diagram.MaxCost, item.MaxCost);
+			Assert.Equal(diagram.MaxDurationBound, item.MaxDurationBound);
 		}
 
 		[Fact]
@@ -136,34 +132,33 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task ListProjectsAsync_LaterRevisionOptimizable_UsesLatestRevision()
+		public async Task ListProjectsAsync_DiagramOverwrittenWithOptimizable_UsesCurrentDiagram()
 		{
 			var project = await TestData.AddProjectAsync("Evolving");
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
+			await TestData.SetDiagramAsync(project, BpmnFixtures.WorkedExample);
 
 			var item = Assert.Single(await CreateService().ListProjectsAsync());
 
-			Assert.Equal(2, item.LatestRevisionNumber);
 			Assert.True(item.IsOptimizable);
 			Assert.NotNull(item.MaxCost);
 		}
 
 		[Fact]
-		public async Task GetProjectAsync_ExistingProject_ReturnsLatestRevisionSummary()
+		public async Task GetProjectAsync_ExistingProject_ReturnsDiagramSummary()
 		{
 			var project = await TestData.AddProjectAsync("Evolving");
-			var latest = await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
+			var diagram = await TestData.SetDiagramAsync(project, BpmnFixtures.WorkedExample);
 
 			var details = await CreateService().GetProjectAsync(project.Id);
 
 			Assert.Equal(project.Id, details.Id);
 			Assert.Equal("Evolving", details.Name);
-			Assert.Equal(2, details.LatestRevision.RevisionNumber);
-			Assert.Equal(latest.FlowNodeCount, details.LatestRevision.FlowNodeCount);
-			Assert.Equal(latest.SizeBytes, details.LatestRevision.SizeBytes);
-			Assert.True(details.LatestRevision.IsOptimizable);
-			Assert.Equal(latest.MaxCost, details.MaxCost);
-			Assert.Equal(latest.MaxDurationBound, details.MaxDurationBound);
+			Assert.Equal(diagram.UpdatedAt, details.Diagram.UpdatedAt);
+			Assert.Equal(diagram.FlowNodeCount, details.Diagram.FlowNodeCount);
+			Assert.Equal(diagram.SizeBytes, details.Diagram.SizeBytes);
+			Assert.True(details.Diagram.IsOptimizable);
+			Assert.Equal(diagram.MaxCost, details.MaxCost);
+			Assert.Equal(diagram.MaxDurationBound, details.MaxDurationBound);
 		}
 
 		[Fact]
@@ -224,19 +219,19 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task UpdateProjectAsync_ChangedTimeUnitAndCurrency_DoesNotModifyRevisions()
+		public async Task UpdateProjectAsync_ChangedTimeUnitAndCurrency_DoesNotModifyDiagram()
 		{
 			var project = await TestData.AddProjectAsync("Launch", BpmnFixtures.WorkedExample);
-			var before = Assert.Single(await LoadRevisionsAsync(project.Id));
+			var before = await LoadDiagramAsync(project.Id);
 
 			await CreateService().UpdateProjectAsync(project.Id, UpdateRequest("Launch", timeUnit: ETimeUnit.Minutes, currency: "USD"));
 
-			var after = Assert.Single(await LoadRevisionsAsync(project.Id));
+			var after = await LoadDiagramAsync(project.Id);
 			Assert.Equal(before.BpmnXml, after.BpmnXml);
 			Assert.Equal(before.ContentSha256, after.ContentSha256);
 			Assert.Equal(before.MaxCost, after.MaxCost);
 			Assert.Equal(before.MaxDurationBound, after.MaxDurationBound);
-			Assert.Equal(1, (await LoadProjectAsync(project.Id)).LatestRevisionNumber);
+			Assert.Equal(before.UpdatedAt, after.UpdatedAt);
 		}
 
 		[Fact]
@@ -246,17 +241,16 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task DeleteProjectAsync_ExistingProject_RemovesRevisionsAndSavedScenarios()
+		public async Task DeleteProjectAsync_ExistingProject_RemovesDiagramAndSavedScenarios()
 		{
 			var project = await TestData.AddProjectAsync("Launch", BpmnFixtures.WorkedExample);
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
-			await TestData.AddSavedScenarioAsync(project, 1, "Cheapest");
+			await TestData.AddSavedScenarioAsync(project, "Cheapest");
 			DbContext.ChangeTracker.Clear();
 
 			await CreateService().DeleteProjectAsync(project.Id);
 
 			Assert.False(await DbContext.Projects.AnyAsync(stored => stored.Id == project.Id));
-			Assert.False(await DbContext.DiagramRevisions.AnyAsync(revision => revision.ProjectId == project.Id));
+			Assert.False(await DbContext.Diagrams.AnyAsync(diagram => diagram.ProjectId == project.Id));
 			Assert.False(await DbContext.SavedScenarios.AnyAsync(scenario => scenario.ProjectId == project.Id));
 		}
 
@@ -265,12 +259,12 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var deleted = await TestData.AddProjectAsync("Deleted");
 			var kept = await TestData.AddProjectAsync("Kept");
-			await TestData.AddSavedScenarioAsync(kept, 1, "Kept scenario");
+			await TestData.AddSavedScenarioAsync(kept, "Kept scenario");
 
 			await CreateService().DeleteProjectAsync(deleted.Id);
 
 			Assert.True(await DbContext.Projects.AnyAsync(stored => stored.Id == kept.Id));
-			Assert.True(await DbContext.DiagramRevisions.AnyAsync(revision => revision.ProjectId == kept.Id));
+			Assert.True(await DbContext.Diagrams.AnyAsync(diagram => diagram.ProjectId == kept.Id));
 			Assert.True(await DbContext.SavedScenarios.AnyAsync(scenario => scenario.ProjectId == kept.Id));
 		}
 

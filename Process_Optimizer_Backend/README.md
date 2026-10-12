@@ -10,30 +10,28 @@ There are no users and no authentication, so **do not expose this API to the int
 ## What it does
 
 1. **Projects:** create, list, read, update and delete. A project has a unique name, a time unit (Minutes, Hours,
-   Days, Weeks) and a currency. Deleting a project also deletes its revisions and saved scenarios.
-2. **Diagram revisions:** every save creates a new numbered revision.
-   - Save the frontend's JSON export (`…/diagram/revisions/json`), or a raw BPMN XML (`…/diagram/revisions`).
-   - Each save must send the `baseRevision` it was edited from. If someone else saved in the meantime, the API
-     answers 409.
-   - The latest 50 revisions are kept. Older ones are kept only while a saved scenario uses them.
-   - You can list and read revisions, and download the latest one as a `.bpmn` file.
+   Days, Weeks) and a currency. Deleting a project also deletes its diagram and saved scenarios.
+2. **Diagram:** each project has exactly one diagram. Saving overwrites it; there is no history and the last save
+   wins.
+   - Save the frontend's JSON export (`PUT …/diagram/json`), or a raw BPMN XML (`PUT …/diagram`).
+   - Read it back, or download it as a `.bpmn` file.
 3. **Validation (internal, no endpoint):** every save is checked against 17 rules (DV-01 … DV-17) such as "no start
-   event", "unreachable node" or "cycle". Issues never block saving; a revision only carries its `errorCount`,
+   event", "unreachable node" or "cycle". Issues never block saving; the diagram only carries its `errorCount`,
    `warningCount` and `isOptimizable`. The scenario endpoints answer 409 for a diagram with errors.
 4. **Scenarios:** the scenario count, a paged list of scenarios, and one scenario in detail. The detail includes the
    schedule of each activity (earliest/latest start and finish, slack), the critical path, the total duration and
    the total cost.
 5. **Resource limits:** the minimum and maximum cost and critical-path duration over all scenarios, using either
    the planned or the pessimistic estimates.
-6. **Saved scenarios:** named, frozen snapshots of a scenario, with a note.
+6. **Saved scenarios:** named, frozen snapshots of a scenario, with a note. `isAvailable` tells whether the same
+   gateway choices still exist after the diagram was overwritten.
 
 ## The frontend JSON format
 
-`POST /api/projects/{projectId}/diagram/revisions/json` takes the frontend export plus the base revision:
+`PUT /api/projects/{projectId}/diagram/json` takes the frontend export as is:
 
 ```json
 {
-  "baseRevision": 1,
   "states": [
     { "id": "Start", "name": "Start", "type": "bpmn:StartEvent", "time": "", "price": "", "Depends_on": [], "Connects_to": ["Task_1"] },
     { "id": "Task_1", "name": "Pack", "type": "bpmn:Task", "time": "15m", "price": "25 EUR", "Depends_on": ["Start"], "Connects_to": ["End"] },
@@ -66,32 +64,31 @@ with an `errors` object listing the problems for each field.
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/projects` | List all projects, most recently updated first |
-| POST | `/projects` | Create a project (revision 1 holds a default diagram) |
-| GET | `/projects/{id}` | Read a project with its latest revision summary |
+| POST | `/projects` | Create a project (starts with a default diagram) |
+| GET | `/projects/{id}` | Read a project with its diagram summary |
 | PUT | `/projects/{id}` | Replace name, description, time unit and currency |
 | DELETE | `/projects/{id}` | Delete a project with everything in it |
-| GET | `/projects/{projectId}/diagram` | Latest revision, including the BPMN XML |
-| POST | `/projects/{projectId}/diagram/revisions/json` | Save the frontend JSON export as a new revision |
-| POST | `/projects/{projectId}/diagram/revisions` | Save a BPMN XML as a new revision |
-| GET | `/projects/{projectId}/diagram/revisions` | List revisions (without XML) |
-| GET | `/projects/{projectId}/diagram/revisions/{revisionNumber}` | Read one revision |
-| GET | `/projects/{projectId}/diagram/file` | Download the latest diagram as `.bpmn` |
-| GET | `/projects/{projectId}/scenario-count?revision=` | Number of scenarios |
-| GET | `/projects/{projectId}/scenarios?revision=&page=&pageSize=` | One page of scenarios (default page 1, size 20, max 100) |
-| GET | `/projects/{projectId}/scenarios/{index}?revision=` | One scenario with its schedule and critical path |
-| GET | `/projects/{projectId}/resource-limits?revision=&basis=` | Cost and duration limits (`Planned` or `Pessimistic`) |
+| GET | `/projects/{projectId}/diagram` | The diagram, including the BPMN XML |
+| PUT | `/projects/{projectId}/diagram/json` | Overwrite the diagram with the frontend JSON export |
+| PUT | `/projects/{projectId}/diagram` | Overwrite the diagram with a BPMN XML |
+| GET | `/projects/{projectId}/diagram/file` | Download the diagram as `.bpmn` |
+| GET | `/projects/{projectId}/scenario-count` | Number of scenarios |
+| GET | `/projects/{projectId}/scenarios?page=&pageSize=` | One page of scenarios (default page 1, size 20, max 100) |
+| GET | `/projects/{projectId}/scenarios/{index}` | One scenario with its schedule and critical path |
+| GET | `/projects/{projectId}/resource-limits?basis=` | Cost and duration limits (`Planned` or `Pessimistic`) |
 | POST / GET | `/projects/{projectId}/saved-scenarios` | Save a scenario snapshot / list saved scenarios |
 | GET / PUT / DELETE | `/projects/{projectId}/saved-scenarios/{id}` | Read, rename or delete a saved scenario |
 
-`revision` is optional everywhere; the latest revision is used when it is omitted.
+Scenario endpoints always use the project's current diagram.
 
 Status codes:
-- **400:** invalid input, or an unknown revision in the query or body.
-- **404:** unknown project, saved scenario or scenario index, or an unknown revision in the route.
-- **409:** a name conflict, a stale `baseRevision`, or a diagram that has errors or too many scenarios.
+- **400:** invalid input.
+- **404:** unknown project, saved scenario or scenario index.
+- **409:** a name conflict, or a diagram that has errors or too many scenarios.
 
 ## Further documentation
 
+- [endpoint/](endpoint/README.md): one short page per controller with request and response examples.
 - [Docs/EndUser/README.md](Docs/EndUser/README.md): for API consumers. Covers workflows, every endpoint, errors and
   the data reference.
 - [Docs/Developer/README.md](Docs/Developer/README.md): for maintainers. Covers architecture, services, the analysis
@@ -115,6 +112,9 @@ origins go in `Cors:AllowedOrigins` in `appsettings.Development.json`.
 
 - SQLite file `ProjectOptimizerAPI/projectoptimizer.db`, connection string `DefaultConnection`.
 - Migrations are applied on startup. The database starts empty; there is no seed data.
+- Tables: `Projects`, `Diagrams` (one row per project) and `SavedScenarios`.
+- The migrations were squashed into a single `InitialCreate`. A `projectoptimizer.db` created before that will not
+  start; delete it (see below).
 - To reset it, stop the API, delete `projectoptimizer.db` (and any `-shm` / `-wal` files), then start it again.
 - To add a migration:
 
@@ -154,7 +154,7 @@ ProjectOptimizerAPI/              web project
   Lib/Helper/                     small utilities (time/price text conversion, hashing, paging, ...)
   Migrations/                     EF Core migrations
 ProjectOptimizerLib/              shared class library
-  Model/                          database entities: Project, DiagramRevision, SavedScenario
+  Model/                          database entities: Project, Diagram, SavedScenario
   Model/Process/                  the frontend JSON format: ProcessDiagram, ProcessState, ProcessBranch
   DTO/                            request and response shapes
   Enum/                           enums used by the API
@@ -164,7 +164,7 @@ ProjectOptimizerTests/            xUnit: Unit/, Integration/, Infrastructure/ (t
 ### How a request flows
 
 `Controller → Service → UnitOfWork / Repository → DbContext`. Scenario endpoints go through `ScenarioCatalog`, which
-loads the revision and asks `DiagramAnalyzer` for the cached analysis of its XML.
+loads the project's diagram and asks `DiagramAnalyzer` for the cached analysis of its XML.
 
 The diagram is always stored as BPMN XML, even when it arrives as JSON. That way there is only one analysis pipeline,
 and a stored diagram can be opened again in any BPMN editor.
@@ -173,8 +173,8 @@ and a stored diagram can be opened again in any BPMN editor.
 
 | Topic | Decision |
 |---|---|
-| Storage | Revisions only ever get added; each keeps the exact XML, its SHA-256 hash, the issue counts and the planned cost/duration limits |
-| Validation | Only malformed XML, a DTD, a non-BPMN root, more than 2 MB or more than 1000 nodes are rejected with 400; other issues are only counted on the revision and never block saving |
+| Storage | One diagram per project, overwritten on every save; it keeps the exact XML, its SHA-256 hash, the issue counts and the planned cost/duration limits |
+| Validation | Only malformed XML, a DTD, a non-BPMN root, more than 2 MB or more than 1000 nodes are rejected with 400; other issues are only counted on the diagram and never block saving |
 | Scenario order | Every scenario has a fixed index and a key such as `G3=F`, so the same diagram always gives the same order |
 | Numbers | `decimal` with invariant culture, so results are reproducible |
 | Enums | Written as strings in JSON and in the database |

@@ -1,101 +1,60 @@
-using ProjectOptimizerAPI.Lib.Analysis;
 using ProjectOptimizerAPI.Lib.Exceptions;
 using ProjectOptimizerAPI.Lib.Helper;
 using ProjectOptimizerAPI.Lib.Interface;
 using ProjectOptimizerLib.DTO;
 using ProjectOptimizerLib.Model;
+using ProjectOptimizerLib.Model.Process;
 
 namespace ProjectOptimizerAPI.Lib.Service
 {
-	public sealed class DiagramService(IUnitOfWork unitOfWork, IProjectAccessGuard projectAccessGuard, IDiagramRevisionFactory diagramRevisionFactory, IProcessJsonConverter processJsonConverter, TimeProvider timeProvider) : IDiagramService
+	public sealed class DiagramService(IUnitOfWork unitOfWork, IProjectAccessGuard projectAccessGuard, IDiagramFactory diagramFactory, IProcessJsonConverter processJsonConverter, TimeProvider timeProvider) : IDiagramService
 	{
-		private const string StaleRevisionMessage = "The diagram was changed by another session. Reload it before saving.";
 		private const string FileExtension = ".bpmn";
 		private const string FallbackFileName = "diagram";
 		private const char FileNameReplacement = '_';
 
 		private static readonly HashSet<char> ForbiddenFileNameChars = [.. Path.GetInvalidFileNameChars(), '"', ';'];
 
-		public async Task<DiagramRevisionDTO> GetLatestDiagramAsync(Guid projectId)
-		{
-			var project = await projectAccessGuard.GetProjectAsync(projectId);
-			return await FindRevisionAsync(projectId, project.LatestRevisionNumber);
-		}
-
-		public async Task<DiagramRevisionDTO> SaveDiagramAsync(Guid projectId, DiagramRevisionCreateDTO request)
-		{
-			var project = await projectAccessGuard.GetProjectAsync(projectId);
-			return await SaveRevisionAsync(project, request.BpmnXml, request.BaseRevision!.Value);
-		}
-
-		public async Task<DiagramRevisionDTO> SaveJsonDiagramAsync(Guid projectId, DiagramJsonRevisionCreateDTO request)
-		{
-			var project = await projectAccessGuard.GetProjectAsync(projectId);
-			var bpmnXml = processJsonConverter.ToBpmnXml(request.ToDiagram(), project.TimeUnit, project.Currency);
-			return await SaveRevisionAsync(project, bpmnXml, request.BaseRevision!.Value);
-		}
-
-		public async Task<List<DiagramRevisionListItemDTO>> ListRevisionsAsync(Guid projectId)
+		public async Task<DiagramDTO> GetDiagramAsync(Guid projectId)
 		{
 			await projectAccessGuard.EnsureExistsAsync(projectId);
-			return await unitOfWork.DiagramRevisionRepository.ListForProjectAsync(projectId);
+			return EnsureFound(await unitOfWork.DiagramRepository.FindDtoAsync(projectId));
 		}
 
-		public async Task<DiagramRevisionDTO> GetRevisionAsync(Guid projectId, int revisionNumber)
+		public async Task<DiagramDTO> SaveDiagramAsync(Guid projectId, DiagramSaveDTO request)
 		{
-			await projectAccessGuard.EnsureExistsAsync(projectId);
-			return await FindRevisionAsync(projectId, revisionNumber);
+			var project = await projectAccessGuard.GetProjectAsync(projectId);
+			return await OverwriteAsync(project, request.BpmnXml);
+		}
+
+		public async Task<DiagramDTO> SaveJsonDiagramAsync(Guid projectId, ProcessDiagram request)
+		{
+			var project = await projectAccessGuard.GetProjectAsync(projectId);
+			var bpmnXml = processJsonConverter.ToBpmnXml(request, project.TimeUnit, project.Currency);
+			return await OverwriteAsync(project, bpmnXml);
 		}
 
 		public async Task<DiagramFileDTO> GetDiagramFileAsync(Guid projectId)
 		{
 			var project = await projectAccessGuard.GetProjectAsync(projectId);
-			var revision = EnsureRevisionFound(await unitOfWork.DiagramRevisionRepository.FindByNumberAsync(projectId, project.LatestRevisionNumber));
+			var diagram = EnsureFound(await unitOfWork.DiagramRepository.FindAsync(projectId));
 
-			return new DiagramFileDTO { FileName = CreateFileName(project.Name), Content = revision.BpmnXml };
+			return new DiagramFileDTO { FileName = CreateFileName(project.Name), Content = diagram.BpmnXml };
 		}
 
-		private async Task<DiagramRevisionDTO> SaveRevisionAsync(Project project, string bpmnXml, int baseRevision)
+		private async Task<DiagramDTO> OverwriteAsync(Project project, string bpmnXml)
 		{
+			var diagram = EnsureFound(await unitOfWork.DiagramRepository.FindAsync(project.Id));
 			var now = timeProvider.UtcNow();
-			var revision = diagramRevisionFactory.Create(project.Id, project.LatestRevisionNumber + 1, bpmnXml, now);
-			EnsureBaseRevisionIsLatest(project, baseRevision);
-
-			unitOfWork.DiagramRevisionRepository.Add(revision);
-			project.LatestRevisionNumber = revision.RevisionNumber;
+			diagramFactory.Apply(diagram, bpmnXml, now);
 			project.UpdatedAt = now;
-			await PruneOldRevisionsAsync(project.Id, revision.RevisionNumber);
-			await unitOfWork.SaveChangesOrConflictAsync(StaleRevisionMessage);
+			await unitOfWork.SaveChangesAsync();
 
-			return await FindRevisionAsync(project.Id, revision.RevisionNumber);
+			return EnsureFound(await unitOfWork.DiagramRepository.FindDtoAsync(project.Id));
 		}
 
-		private async Task<DiagramRevisionDTO> FindRevisionAsync(Guid projectId, int revisionNumber) =>
-			EnsureRevisionFound(await unitOfWork.DiagramRevisionRepository.FindDtoAsync(projectId, revisionNumber));
-
-		private static void EnsureBaseRevisionIsLatest(Project project, int baseRevision)
-		{
-			if (baseRevision != project.LatestRevisionNumber)
-			{
-				throw new ConflictException(StaleRevisionMessage);
-			}
-		}
-
-		private async Task PruneOldRevisionsAsync(Guid projectId, int newRevisionNumber)
-		{
-			var maxPrunableRevisionNumber = newRevisionNumber - AnalysisLimits.RevisionsToKeep;
-			if (maxPrunableRevisionNumber < 1)
-			{
-				return;
-			}
-
-			var referencedRevisionNumbers = await unitOfWork.SavedScenarioRepository.ListReferencedRevisionNumbersAsync(projectId);
-			var prunable = await unitOfWork.DiagramRevisionRepository.ListPrunableAsync(projectId, maxPrunableRevisionNumber, referencedRevisionNumbers);
-			prunable.ForEach(unitOfWork.DiagramRevisionRepository.Remove);
-		}
-
-		private static TRevision EnsureRevisionFound<TRevision>(TRevision? revision) where TRevision : class =>
-			revision ?? throw new NotFoundException(ErrorMessages.RevisionNotFound);
+		private static TDiagram EnsureFound<TDiagram>(TDiagram? diagram) where TDiagram : class =>
+			diagram ?? throw new NotFoundException(ErrorMessages.DiagramNotFound);
 
 		private static string CreateFileName(string projectName)
 		{

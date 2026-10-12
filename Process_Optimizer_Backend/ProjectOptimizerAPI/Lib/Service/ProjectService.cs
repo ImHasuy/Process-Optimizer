@@ -6,7 +6,7 @@ using ProjectOptimizerLib.DTO;
 
 namespace ProjectOptimizerAPI.Lib.Service
 {
-	public sealed class ProjectService(IUnitOfWork unitOfWork, IProjectAccessGuard projectAccessGuard, IDiagramRevisionFactory diagramRevisionFactory, TimeProvider timeProvider) : IProjectService
+	public sealed class ProjectService(IUnitOfWork unitOfWork, IProjectAccessGuard projectAccessGuard, IDiagramFactory diagramFactory, TimeProvider timeProvider) : IProjectService
 	{
 		private const string NameTakenMessage = "A project with this name already exists.";
 
@@ -20,7 +20,7 @@ namespace ProjectOptimizerAPI.Lib.Service
 			await EnsureNameIsAvailableAsync(NameNormalizer.Normalize(name), null);
 
 			var project = ProjectFactory.Create(name, request.Description, request.TimeUnit ?? ProjectFactory.DefaultTimeUnit, request.Currency ?? ProjectFactory.DefaultCurrency, timeProvider.UtcNow());
-			ProjectFactory.AddRevision(project, diagramRevisionFactory, DefaultDiagram.Xml);
+			project.Diagram = diagramFactory.Create(project.Id, DefaultDiagram.Xml, project.CreatedAt);
 			unitOfWork.ProjectRepository.Add(project);
 			await unitOfWork.SaveChangesOrConflictAsync(NameTakenMessage);
 

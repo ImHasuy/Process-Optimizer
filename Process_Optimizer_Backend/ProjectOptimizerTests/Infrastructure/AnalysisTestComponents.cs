@@ -21,7 +21,7 @@ namespace ProjectOptimizerTests.Infrastructure
 			ResourceLimitCalculator = new ResourceLimitCalculator();
 			Cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = CacheSizeLimit });
 			Analyzer = new DiagramAnalyzer(Parser, Validator, Indexer, ScenarioBuilder, Cache);
-			RevisionFactory = new DiagramRevisionFactory(Analyzer, ResourceLimitCalculator);
+			DiagramFactory = new DiagramFactory(Analyzer, ResourceLimitCalculator);
 		}
 
 		public IBpmnGraphParser Parser { get; }
@@ -33,7 +33,7 @@ namespace ProjectOptimizerTests.Infrastructure
 		public IResourceLimitCalculator ResourceLimitCalculator { get; }
 		public IMemoryCache Cache { get; }
 		public IDiagramAnalyzer Analyzer { get; }
-		public IDiagramRevisionFactory RevisionFactory { get; }
+		public IDiagramFactory DiagramFactory { get; }
 
 		public static AnalysisTestComponents Create() => new();
 

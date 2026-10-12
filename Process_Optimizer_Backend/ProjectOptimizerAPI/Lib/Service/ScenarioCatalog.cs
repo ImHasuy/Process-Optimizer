@@ -1,4 +1,3 @@
-using ProjectOptimizerAPI.Lib.Analysis;
 using ProjectOptimizerAPI.Lib.Analysis.Model;
 using ProjectOptimizerAPI.Lib.Exceptions;
 using ProjectOptimizerAPI.Lib.Helper;
@@ -6,25 +5,25 @@ using ProjectOptimizerAPI.Lib.Interface;
 
 namespace ProjectOptimizerAPI.Lib.Service
 {
-	public sealed class ScenarioCatalog(IRevisionResolver revisionResolver, IDiagramAnalyzer diagramAnalyzer, IScenarioIndexer scenarioIndexer) : IScenarioCatalog
+	public sealed class ScenarioCatalog(IDiagramResolver diagramResolver, IDiagramAnalyzer diagramAnalyzer, IScenarioIndexer scenarioIndexer) : IScenarioCatalog
 	{
-		public async Task<AnalyzedRevision> GetOptimizableRevisionAsync(Guid projectId, int? revisionNumber)
+		public async Task<AnalyzedDiagram> GetOptimizableDiagramAsync(Guid projectId)
 		{
-			var analyzed = await AnalyzeRevisionAsync(projectId, revisionNumber);
+			var analyzed = await AnalyzeAsync(projectId);
 			EnsureOptimizable(analyzed.Analysis);
 			return analyzed;
 		}
 
-		public async Task<IndexedRevision> GetIndexedRevisionAsync(Guid projectId, int? revisionNumber)
+		public async Task<IndexedDiagram> GetIndexedDiagramAsync(Guid projectId)
 		{
-			var analyzed = await GetOptimizableRevisionAsync(projectId, revisionNumber);
+			var analyzed = await GetOptimizableDiagramAsync(projectId);
 			EnsureIndexable(analyzed.Analysis);
-			return new IndexedRevision(analyzed.Revision, analyzed.Analysis, (long)analyzed.Analysis.ScenarioCount);
+			return new IndexedDiagram(analyzed.Diagram, analyzed.Analysis, (long)analyzed.Analysis.ScenarioCount);
 		}
 
-		public async Task<Func<string, long?>> CreateLatestRevisionRankerAsync(Guid projectId)
+		public async Task<Func<string, long?>> CreateRankerAsync(Guid projectId)
 		{
-			var analysis = (await AnalyzeRevisionAsync(projectId, null)).Analysis;
+			var analysis = (await AnalyzeAsync(projectId)).Analysis;
 			if (!IsIndexable(analysis))
 			{
 				return _ => null;
@@ -34,11 +33,11 @@ namespace ProjectOptimizerAPI.Lib.Service
 			return scenarioKey => scenarioIndexer.Rank(structure, scenarioKey);
 		}
 
-		private async Task<AnalyzedRevision> AnalyzeRevisionAsync(Guid projectId, int? revisionNumber)
+		private async Task<AnalyzedDiagram> AnalyzeAsync(Guid projectId)
 		{
-			var revision = await revisionResolver.ResolveAsync(projectId, revisionNumber);
-			var analysis = diagramAnalyzer.Analyze(revision.ContentSha256, revision.BpmnXml);
-			return new AnalyzedRevision(revision, analysis);
+			var diagram = await diagramResolver.ResolveAsync(projectId);
+			var analysis = diagramAnalyzer.Analyze(diagram.ContentSha256, diagram.BpmnXml);
+			return new AnalyzedDiagram(diagram, analysis);
 		}
 
 		private static bool IsIndexable(DiagramAnalysis analysis) =>

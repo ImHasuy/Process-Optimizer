@@ -3,7 +3,7 @@ namespace ProjectOptimizerAPI.Lib.Interface
 	public interface IUnitOfWork
 	{
 		IProjectRepository ProjectRepository { get; }
-		IDiagramRevisionRepository DiagramRevisionRepository { get; }
+		IDiagramRepository DiagramRepository { get; }
 		ISavedScenarioRepository SavedScenarioRepository { get; }
 
 		Task SaveChangesAsync();

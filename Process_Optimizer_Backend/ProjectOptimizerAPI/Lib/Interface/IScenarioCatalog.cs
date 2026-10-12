@@ -4,8 +4,8 @@ namespace ProjectOptimizerAPI.Lib.Interface
 {
 	public interface IScenarioCatalog
 	{
-		Task<AnalyzedRevision> GetOptimizableRevisionAsync(Guid projectId, int? revisionNumber);
-		Task<IndexedRevision> GetIndexedRevisionAsync(Guid projectId, int? revisionNumber);
-		Task<Func<string, long?>> CreateLatestRevisionRankerAsync(Guid projectId);
+		Task<AnalyzedDiagram> GetOptimizableDiagramAsync(Guid projectId);
+		Task<IndexedDiagram> GetIndexedDiagramAsync(Guid projectId);
+		Task<Func<string, long?>> CreateRankerAsync(Guid projectId);
 	}
 }

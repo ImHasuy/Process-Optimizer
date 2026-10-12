@@ -2,8 +2,8 @@ using ProjectOptimizerAPI.Lib.Analysis;
 
 namespace ProjectOptimizerAPI.Lib.Analysis.Model
 {
-	public sealed record IndexedRevision(
-		ResolvedRevision Revision,
+	public sealed record IndexedDiagram(
+		ResolvedDiagram Diagram,
 		DiagramAnalysis Analysis,
 		long Count)
 	{

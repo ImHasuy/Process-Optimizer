@@ -1,9 +1,8 @@
 namespace ProjectOptimizerLib.DTO
 {
-	public sealed class DiagramRevisionListItemDTO
+	public sealed class DiagramSummaryDTO
 	{
-		public int RevisionNumber { get; init; }
-		public DateTime CreatedAt { get; init; }
+		public DateTime UpdatedAt { get; init; }
 		public int SizeBytes { get; init; }
 		public int FlowNodeCount { get; init; }
 		public int ErrorCount { get; init; }

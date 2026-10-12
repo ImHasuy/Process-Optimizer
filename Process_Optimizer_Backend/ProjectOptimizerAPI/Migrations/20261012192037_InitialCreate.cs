@@ -21,7 +21,6 @@ namespace ProjectOptimizerAPI.Migrations
                     Description = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
                     TimeUnit = table.Column<string>(type: "TEXT", maxLength: 30, nullable: false),
                     Currency = table.Column<string>(type: "TEXT", maxLength: 3, nullable: false),
-                    LatestRevisionNumber = table.Column<int>(type: "INTEGER", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
@@ -31,12 +30,10 @@ namespace ProjectOptimizerAPI.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "DiagramRevisions",
+                name: "Diagrams",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     ProjectId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    RevisionNumber = table.Column<int>(type: "INTEGER", nullable: false),
                     BpmnXml = table.Column<string>(type: "TEXT", nullable: false),
                     ContentSha256 = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
                     SizeBytes = table.Column<int>(type: "INTEGER", nullable: false),
@@ -46,13 +43,13 @@ namespace ProjectOptimizerAPI.Migrations
                     IsOptimizable = table.Column<bool>(type: "INTEGER", nullable: false),
                     MaxCost = table.Column<decimal>(type: "TEXT", nullable: true),
                     MaxDurationBound = table.Column<decimal>(type: "TEXT", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
+                    UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_DiagramRevisions", x => x.Id);
+                    table.PrimaryKey("PK_Diagrams", x => x.ProjectId);
                     table.ForeignKey(
-                        name: "FK_DiagramRevisions_Projects_ProjectId",
+                        name: "FK_Diagrams_Projects_ProjectId",
                         column: x => x.ProjectId,
                         principalTable: "Projects",
                         principalColumn: "Id",
@@ -68,7 +65,6 @@ namespace ProjectOptimizerAPI.Migrations
                     Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     NormalizedName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     Note = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
-                    RevisionNumber = table.Column<int>(type: "INTEGER", nullable: false),
                     ScenarioIndex = table.Column<long>(type: "INTEGER", nullable: false),
                     OrderingVersion = table.Column<int>(type: "INTEGER", nullable: false),
                     ScenarioKey = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: false),
@@ -89,12 +85,6 @@ namespace ProjectOptimizerAPI.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_DiagramRevisions_ProjectId_RevisionNumber",
-                table: "DiagramRevisions",
-                columns: new[] { "ProjectId", "RevisionNumber" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Projects_NormalizedName",
                 table: "Projects",
                 column: "NormalizedName",
@@ -110,18 +100,13 @@ namespace ProjectOptimizerAPI.Migrations
                 table: "SavedScenarios",
                 columns: new[] { "ProjectId", "NormalizedName" },
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_SavedScenarios_ProjectId_RevisionNumber",
-                table: "SavedScenarios",
-                columns: new[] { "ProjectId", "RevisionNumber" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "DiagramRevisions");
+                name: "Diagrams");
 
             migrationBuilder.DropTable(
                 name: "SavedScenarios");

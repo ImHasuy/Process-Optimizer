@@ -8,7 +8,6 @@ namespace ProjectOptimizerLib.Model
 		public string Name { get; set; } = string.Empty;
 		public string NormalizedName { get; set; } = string.Empty;
 		public string? Note { get; set; }
-		public int RevisionNumber { get; set; }
 		public long ScenarioIndex { get; set; }
 		public int OrderingVersion { get; set; }
 		public string ScenarioKey { get; set; } = string.Empty;

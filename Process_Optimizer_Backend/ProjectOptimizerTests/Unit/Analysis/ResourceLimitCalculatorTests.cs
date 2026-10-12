@@ -15,7 +15,7 @@ namespace ProjectOptimizerTests.Unit.Analysis
 		private const int ChoicesAboveIndexLimit = 53;
 		private const int ChoicesBelowIndexLimit = 52;
 
-		private static readonly RevisionContext Context = new(Guid.Parse("5b0f3c52-6f1e-4d0a-9a43-2f1c7d8e9a10"), 3, ETimeUnit.Days, "EUR");
+		private static readonly ProjectContext Context = new(Guid.Parse("5b0f3c52-6f1e-4d0a-9a43-2f1c7d8e9a10"), ETimeUnit.Days, "EUR");
 
 		private readonly AnalysisTestComponents _components = AnalysisTestComponents.Create();
 		private readonly ResourceLimitCalculator _calculator = new();
@@ -89,14 +89,13 @@ namespace ProjectOptimizerTests.Unit.Analysis
 		}
 
 		[Fact]
-		public void Calculate_WorkedExample_EchoesRevisionContextAndScenarioCount()
+		public void Calculate_WorkedExample_EchoesProjectContextAndScenarioCount()
 		{
 			var analysis = AnalyzeOptimizable(BpmnFixtures.WorkedExample);
 
 			var limits = Calculate(analysis);
 
 			Assert.Equal(Context.ProjectId, limits.ProjectId);
-			Assert.Equal(Context.RevisionNumber, limits.RevisionNumber);
 			Assert.Equal(ETimeUnit.Days, limits.TimeUnit);
 			Assert.Equal("EUR", limits.Currency);
 			Assert.Equal(EResourceLimitBasis.Planned, limits.Basis);

@@ -15,13 +15,13 @@ namespace ProjectOptimizerAPI.Lib.Service
 
 		public async Task<SavedScenarioDTO> CreateSavedScenarioAsync(Guid projectId, SavedScenarioCreateDTO request)
 		{
-			var indexedRevision = await scenarioCatalog.GetIndexedRevisionAsync(projectId, request.Revision);
+			var indexed = await scenarioCatalog.GetIndexedDiagramAsync(projectId);
 			var index = request.ScenarioIndex!.Value;
-			EnsureIndexIsWithinCount(indexedRevision, index);
+			EnsureIndexIsWithinCount(indexed, index);
 			var normalizedName = NameNormalizer.Normalize(request.Name);
 			await EnsureNameIsAvailableAsync(projectId, normalizedName, null);
 
-			var snapshot = BuildSnapshot(indexedRevision, index);
+			var snapshot = BuildSnapshot(indexed, index);
 			var savedScenario = CreateEntity(projectId, request, normalizedName, snapshot);
 			unitOfWork.SavedScenarioRepository.Add(savedScenario);
 			await unitOfWork.SaveChangesOrConflictAsync(DuplicateNameMessage);
@@ -31,18 +31,18 @@ namespace ProjectOptimizerAPI.Lib.Service
 
 		public async Task<List<SavedScenarioListItemDTO>> ListSavedScenariosAsync(Guid projectId)
 		{
-			var ranker = await scenarioCatalog.CreateLatestRevisionRankerAsync(projectId);
+			var ranker = await scenarioCatalog.CreateRankerAsync(projectId);
 			var savedScenarios = await unitOfWork.SavedScenarioRepository.ListForProjectAsync(projectId);
 			return savedScenarios
-				.Select(savedScenario => savedScenario with { IsAvailableInLatestRevision = ranker(savedScenario.ScenarioKey).HasValue })
+				.Select(savedScenario => savedScenario with { IsAvailable = ranker(savedScenario.ScenarioKey).HasValue })
 				.ToList();
 		}
 
 		public async Task<SavedScenarioDTO> GetSavedScenarioAsync(Guid projectId, Guid id)
 		{
-			var ranker = await scenarioCatalog.CreateLatestRevisionRankerAsync(projectId);
+			var ranker = await scenarioCatalog.CreateRankerAsync(projectId);
 			var savedScenario = await GetRequiredSavedScenarioAsync(projectId, id);
-			return MapWithLatestIndex(savedScenario, ranker);
+			return MapWithCurrentIndex(savedScenario, ranker);
 		}
 
 		public async Task UpdateSavedScenarioAsync(Guid projectId, Guid id, SavedScenarioUpdateDTO request)
@@ -66,10 +66,10 @@ namespace ProjectOptimizerAPI.Lib.Service
 			await unitOfWork.SaveChangesAsync();
 		}
 
-		private ScenarioDTO BuildSnapshot(IndexedRevision indexedRevision, long index)
+		private ScenarioDTO BuildSnapshot(IndexedDiagram indexed, long index)
 		{
-			var computation = diagramAnalyzer.GetScenario(indexedRevision.Analysis, index);
-			return scenarioBuilder.ToDto(computation, indexedRevision.Revision.Context, indexedRevision.Count);
+			var computation = diagramAnalyzer.GetScenario(indexed.Analysis, index);
+			return scenarioBuilder.ToDto(computation, indexed.Diagram.Context, indexed.Count);
 		}
 
 		private SavedScenario CreateEntity(Guid projectId, SavedScenarioCreateDTO request, string normalizedName, ScenarioDTO snapshot) => new()
@@ -79,7 +79,6 @@ namespace ProjectOptimizerAPI.Lib.Service
 			Name = request.Name.Trim(),
 			NormalizedName = normalizedName,
 			Note = request.Note,
-			RevisionNumber = snapshot.RevisionNumber,
 			ScenarioIndex = snapshot.Index,
 			OrderingVersion = snapshot.OrderingVersion,
 			ScenarioKey = snapshot.Key,
@@ -89,12 +88,12 @@ namespace ProjectOptimizerAPI.Lib.Service
 			CreatedAt = timeProvider.UtcNow()
 		};
 
-		private static SavedScenarioDTO MapWithLatestIndex(SavedScenario savedScenario, Func<string, long?> ranker)
+		private static SavedScenarioDTO MapWithCurrentIndex(SavedScenario savedScenario, Func<string, long?> ranker)
 		{
 			var adapter = savedScenario.BuildAdapter();
-			if (ranker(savedScenario.ScenarioKey) is long latestRevisionIndex)
+			if (ranker(savedScenario.ScenarioKey) is long currentIndex)
 			{
-				adapter = adapter.AddParameters(SavedScenarioMappingConfig.LatestRevisionIndexParameter, latestRevisionIndex);
+				adapter = adapter.AddParameters(SavedScenarioMappingConfig.CurrentIndexParameter, currentIndex);
 			}
 
 			return adapter.AdaptToType<SavedScenarioDTO>();
@@ -104,9 +103,9 @@ namespace ProjectOptimizerAPI.Lib.Service
 			await unitOfWork.SavedScenarioRepository.FindForProjectAsync(projectId, id)
 			?? throw NotFoundException.For<SavedScenario>(id);
 
-		private static void EnsureIndexIsWithinCount(IndexedRevision indexedRevision, long index)
+		private static void EnsureIndexIsWithinCount(IndexedDiagram indexed, long index)
 		{
-			if (!indexedRevision.Contains(index))
+			if (!indexed.Contains(index))
 			{
 				throw new InvalidRequestException(ErrorMessages.ScenarioNotFound);
 			}

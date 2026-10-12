@@ -13,6 +13,6 @@ namespace ProjectOptimizerLib.DTO
 		public DateTime UpdatedAt { get; init; }
 		public decimal? MaxCost { get; init; }
 		public decimal? MaxDurationBound { get; init; }
-		public DiagramRevisionListItemDTO LatestRevision { get; init; } = null!;
+		public DiagramSummaryDTO Diagram { get; init; } = null!;
 	}
 }

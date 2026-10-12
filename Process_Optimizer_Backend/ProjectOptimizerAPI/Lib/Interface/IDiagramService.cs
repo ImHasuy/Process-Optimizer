@@ -1,14 +1,13 @@
 using ProjectOptimizerLib.DTO;
+using ProjectOptimizerLib.Model.Process;
 
 namespace ProjectOptimizerAPI.Lib.Interface
 {
 	public interface IDiagramService
 	{
-		Task<DiagramRevisionDTO> GetLatestDiagramAsync(Guid projectId);
-		Task<DiagramRevisionDTO> SaveDiagramAsync(Guid projectId, DiagramRevisionCreateDTO request);
-		Task<DiagramRevisionDTO> SaveJsonDiagramAsync(Guid projectId, DiagramJsonRevisionCreateDTO request);
-		Task<List<DiagramRevisionListItemDTO>> ListRevisionsAsync(Guid projectId);
-		Task<DiagramRevisionDTO> GetRevisionAsync(Guid projectId, int revisionNumber);
+		Task<DiagramDTO> GetDiagramAsync(Guid projectId);
+		Task<DiagramDTO> SaveDiagramAsync(Guid projectId, DiagramSaveDTO request);
+		Task<DiagramDTO> SaveJsonDiagramAsync(Guid projectId, ProcessDiagram request);
 		Task<DiagramFileDTO> GetDiagramFileAsync(Guid projectId);
 	}
 }

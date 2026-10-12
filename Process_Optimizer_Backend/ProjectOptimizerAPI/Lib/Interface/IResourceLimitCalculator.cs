@@ -6,6 +6,6 @@ namespace ProjectOptimizerAPI.Lib.Interface
 {
 	public interface IResourceLimitCalculator
 	{
-		ResourceLimitsDTO Calculate(ProcessGraph graph, StructureFragment root, EResourceLimitBasis basis, RevisionContext context);
+		ResourceLimitsDTO Calculate(ProcessGraph graph, StructureFragment root, EResourceLimitBasis basis, ProjectContext context);
 	}
 }

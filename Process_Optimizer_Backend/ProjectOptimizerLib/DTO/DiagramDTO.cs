@@ -1,9 +1,8 @@
 namespace ProjectOptimizerLib.DTO
 {
-	public sealed class DiagramRevisionDTO
+	public sealed class DiagramDTO
 	{
-		public int RevisionNumber { get; init; }
-		public DateTime CreatedAt { get; init; }
+		public DateTime UpdatedAt { get; init; }
 		public string BpmnXml { get; init; } = string.Empty;
 		public string ContentSha256 { get; init; } = string.Empty;
 		public int SizeBytes { get; init; }

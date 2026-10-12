@@ -4,9 +4,6 @@ namespace ProjectOptimizerLib.DTO
 {
 	public sealed class ScenarioFilterDTO
 	{
-		[Range(1, int.MaxValue, ErrorMessage = "The revision must be at least 1.")]
-		public int? Revision { get; set; }
-
 		[Range(1, int.MaxValue, ErrorMessage = "The page must be at least 1.")]
 		public int? Page { get; set; }
 

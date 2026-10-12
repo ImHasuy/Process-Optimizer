@@ -31,34 +31,20 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			var result = await _service.GetScenarioCountAsync(project.Id, null);
+			var result = await _service.GetScenarioCountAsync(project.Id);
 
 			Assert.Equal(2, result.Count);
-			Assert.Equal(1, result.RevisionNumber);
 			Assert.Equal(AnalysisLimits.OrderingVersion, result.OrderingVersion);
 		}
 
 		[Fact]
-		public async Task GetScenarioCountAsync_OlderRevisionRequested_ReturnsCountOfThatRevision()
+		public async Task GetScenarioCountAsync_AfterDiagramOverwrite_ReturnsCountOfCurrentDiagram()
 		{
 			var project = await AddWorkedExampleProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnDiagramBuilder.SequentialExclusiveChoices(3));
+			await TestData.SetDiagramAsync(project, BpmnDiagramBuilder.SequentialExclusiveChoices(3));
 
-			var result = await _service.GetScenarioCountAsync(project.Id, 1);
+			var result = await _service.GetScenarioCountAsync(project.Id);
 
-			Assert.Equal(1, result.RevisionNumber);
-			Assert.Equal(2, result.Count);
-		}
-
-		[Fact]
-		public async Task GetScenarioCountAsync_LatestRevisionByDefault_ReturnsLatestCount()
-		{
-			var project = await AddWorkedExampleProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnDiagramBuilder.SequentialExclusiveChoices(3));
-
-			var result = await _service.GetScenarioCountAsync(project.Id, null);
-
-			Assert.Equal(2, result.RevisionNumber);
 			Assert.Equal(8, result.Count);
 		}
 
@@ -67,7 +53,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioCountAsync(project.Id, null));
+			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioCountAsync(project.Id));
 
 			Assert.Equal(ErrorMessages.DiagramHasErrors, exception.Message);
 		}
@@ -77,7 +63,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: BpmnDiagramBuilder.SequentialExclusiveChoices(FiftyFourChoices));
 
-			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioCountAsync(project.Id, null));
+			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioCountAsync(project.Id));
 
 			Assert.Equal(ErrorMessages.TooManyScenarios, exception.Message);
 		}
@@ -87,7 +73,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: BpmnDiagramBuilder.SequentialExclusiveChoices(53));
 
-			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioCountAsync(project.Id, null));
+			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioCountAsync(project.Id));
 
 			Assert.Equal(ErrorMessages.TooManyScenarios, exception.Message);
 		}
@@ -97,23 +83,15 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: BpmnDiagramBuilder.SequentialExclusiveChoices(52));
 
-			var result = await _service.GetScenarioCountAsync(project.Id, null);
+			var result = await _service.GetScenarioCountAsync(project.Id);
 
 			Assert.Equal(1L << 52, result.Count);
 		}
 
 		[Fact]
-		public async Task GetScenarioCountAsync_UnknownRevision_ThrowsInvalidRequest()
-		{
-			var project = await AddWorkedExampleProjectAsync();
-
-			await Assert.ThrowsAsync<InvalidRequestException>(() => _service.GetScenarioCountAsync(project.Id, 99));
-		}
-
-		[Fact]
 		public async Task GetScenarioCountAsync_UnknownProject_ThrowsNotFound()
 		{
-			await Assert.ThrowsAsync<NotFoundException>(() => _service.GetScenarioCountAsync(Guid.NewGuid(), null));
+			await Assert.ThrowsAsync<NotFoundException>(() => _service.GetScenarioCountAsync(Guid.NewGuid()));
 		}
 
 		[Fact]
@@ -121,7 +99,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			var result = await _service.GetScenarioAsync(project.Id, 0, null);
+			var result = await _service.GetScenarioAsync(project.Id, 0);
 
 			Assert.Equal(0, result.Index);
 			Assert.Equal("G3=E", result.Key);
@@ -137,7 +115,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			var result = await _service.GetScenarioAsync(project.Id, 1, null);
+			var result = await _service.GetScenarioAsync(project.Id, 1);
 
 			Assert.Equal("G3=F", result.Key);
 			Assert.Equal(20m, result.TotalDuration);
@@ -153,7 +131,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			var result = await _service.GetScenarioAsync(project.Id, 1, null);
+			var result = await _service.GetScenarioAsync(project.Id, 1);
 
 			var activity = Assert.Single(result.Activities, item => item.BpmnId == "C");
 			Assert.Equal(5m, activity.EarliestStart);
@@ -165,14 +143,13 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task GetScenarioAsync_ValidIndex_ReturnsRevisionContext()
+		public async Task GetScenarioAsync_ValidIndex_ReturnsProjectContext()
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			var result = await _service.GetScenarioAsync(project.Id, 1, null);
+			var result = await _service.GetScenarioAsync(project.Id, 1);
 
 			Assert.Equal(project.Id, result.ProjectId);
-			Assert.Equal(1, result.RevisionNumber);
 			Assert.Equal(AnalysisLimits.OrderingVersion, result.OrderingVersion);
 			Assert.Equal(2, result.Count);
 			Assert.Equal(ETimeUnit.Days, result.TimeUnit);
@@ -184,7 +161,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			var exception = await Assert.ThrowsAsync<NotFoundException>(() => _service.GetScenarioAsync(project.Id, 2, null));
+			var exception = await Assert.ThrowsAsync<NotFoundException>(() => _service.GetScenarioAsync(project.Id, 2));
 
 			Assert.Equal(ErrorMessages.ScenarioNotFound, exception.Message);
 		}
@@ -194,7 +171,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			await Assert.ThrowsAsync<NotFoundException>(() => _service.GetScenarioAsync(project.Id, long.MaxValue, null));
+			await Assert.ThrowsAsync<NotFoundException>(() => _service.GetScenarioAsync(project.Id, long.MaxValue));
 		}
 
 		[Fact]
@@ -202,8 +179,8 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
-			var first = await _service.GetScenarioAsync(project.Id, 1, null);
-			var second = await _service.GetScenarioAsync(project.Id, 1, null);
+			var first = await _service.GetScenarioAsync(project.Id, 1);
+			var second = await _service.GetScenarioAsync(project.Id, 1);
 
 			Assert.Equal(JsonSerializer.Serialize(first), JsonSerializer.Serialize(second));
 		}
@@ -213,9 +190,9 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var original = await AddWorkedExampleProjectAsync();
 			var copy = await TestData.AddProjectAsync(bpmnXml: BpmnFixtures.WorkedExample, currency: "USD");
-			await _service.GetScenarioAsync(original.Id, 0, null);
+			await _service.GetScenarioAsync(original.Id, 0);
 
-			var result = await _service.GetScenarioAsync(copy.Id, 0, null);
+			var result = await _service.GetScenarioAsync(copy.Id, 0);
 
 			Assert.Equal(copy.Id, result.ProjectId);
 			Assert.Equal("USD", result.Currency);
@@ -226,7 +203,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioAsync(project.Id, 0, null));
+			await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioAsync(project.Id, 0));
 		}
 
 		[Fact]
@@ -234,15 +211,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: BpmnDiagramBuilder.SequentialExclusiveChoices(FiftyFourChoices));
 
-			await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioAsync(project.Id, 0, null));
-		}
-
-		[Fact]
-		public async Task GetScenarioAsync_UnknownRevision_ThrowsInvalidRequest()
-		{
-			var project = await AddWorkedExampleProjectAsync();
-
-			await Assert.ThrowsAsync<InvalidRequestException>(() => _service.GetScenarioAsync(project.Id, 0, 2));
+			await Assert.ThrowsAsync<ConflictException>(() => _service.GetScenarioAsync(project.Id, 0));
 		}
 
 		[Fact]
@@ -344,14 +313,13 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task GetResourceLimitsAsync_WorkedExample_ReturnsRevisionContextAndPlannedBasis()
+		public async Task GetResourceLimitsAsync_WorkedExample_ReturnsProjectContextAndPlannedBasis()
 		{
 			var project = await AddWorkedExampleProjectAsync();
 
 			var result = await _service.GetResourceLimitsAsync(project.Id, new ResourceLimitsQueryDTO());
 
 			Assert.Equal(project.Id, result.ProjectId);
-			Assert.Equal(1, result.RevisionNumber);
 			Assert.Equal(EResourceLimitBasis.Planned, result.Basis);
 			Assert.Equal(2, result.ScenarioCount);
 			Assert.Equal("EUR", result.Currency);
@@ -403,15 +371,6 @@ namespace ProjectOptimizerTests.Unit.Service
 			var result = await _service.GetResourceLimitsAsync(project.Id, new ResourceLimitsQueryDTO { Basis = EResourceLimitBasis.Planned });
 
 			Assert.Equal(21m, result.MaxCriticalPathDuration);
-		}
-
-		[Fact]
-		public async Task GetResourceLimitsAsync_UnknownRevision_ThrowsInvalidRequest()
-		{
-			var project = await AddWorkedExampleProjectAsync();
-
-			await Assert.ThrowsAsync<InvalidRequestException>(
-				() => _service.GetResourceLimitsAsync(project.Id, new ResourceLimitsQueryDTO { Revision = 5 }));
 		}
 
 		[Fact]

@@ -276,7 +276,6 @@ namespace ProjectOptimizerTests.Unit.Analysis
 			var dto = _builder.ToDto(computation, context, 2);
 
 			Assert.Equal(context.ProjectId, dto.ProjectId);
-			Assert.Equal(7, dto.RevisionNumber);
 			Assert.Equal(1, dto.OrderingVersion);
 			Assert.Equal(1, dto.Index);
 			Assert.Equal(2, dto.Count);
@@ -352,7 +351,7 @@ namespace ProjectOptimizerTests.Unit.Analysis
 
 		private static ScenarioSelection NoChoices() => new(0, string.Empty, []);
 
-		private static RevisionContext WorkedExampleContext() => new(Guid.Parse("6d0c1a5e-0000-4000-8000-000000000001"), 7, ETimeUnit.Days, "EUR");
+		private static ProjectContext WorkedExampleContext() => new(Guid.Parse("6d0c1a5e-0000-4000-8000-000000000001"), ETimeUnit.Days, "EUR");
 
 		private static string SingleTaskDiagram(decimal? duration, decimal? cost) =>
 			new BpmnDiagramBuilder()

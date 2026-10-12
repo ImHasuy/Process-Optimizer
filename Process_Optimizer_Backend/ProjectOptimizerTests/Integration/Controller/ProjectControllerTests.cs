@@ -36,7 +36,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 		}
 
 		[Fact]
-		public async Task CreateProject_ValidBody_ReturnsCreatedWithLocationAndRevisionOne()
+		public async Task CreateProject_ValidBody_ReturnsCreatedWithLocationAndDefaultDiagram()
 		{
 			var name = UniqueName();
 
@@ -50,8 +50,8 @@ namespace ProjectOptimizerTests.Integration.Controller
 			Assert.Equal("Plan", created.Description);
 			Assert.Equal(ETimeUnit.Hours, created.TimeUnit);
 			Assert.Equal("USD", created.Currency);
-			Assert.Equal(1, created.LatestRevision.RevisionNumber);
-			Assert.False(created.LatestRevision.IsOptimizable);
+			Assert.Equal(1, created.Diagram.FlowNodeCount);
+			Assert.False(created.Diagram.IsOptimizable);
 			Assert.EndsWith(ProjectUrl(created.Id), response.Headers.Location!.ToString(), StringComparison.OrdinalIgnoreCase);
 		}
 
@@ -134,7 +134,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 		}
 
 		[Fact]
-		public async Task GetProject_Existing_ReturnsOkWithLatestRevision()
+		public async Task GetProject_Existing_ReturnsOkWithDiagramSummary()
 		{
 			var created = await _client.CreateProjectAsync();
 
@@ -143,7 +143,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 			Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 			var project = (await response.ReadApiResponseAsync<ProjectDetailsDTO>()).Data!;
 			Assert.Equal(created.Name, project.Name);
-			Assert.Equal(1, project.LatestRevision.RevisionNumber);
+			Assert.Equal(created.Diagram.SizeBytes, project.Diagram.SizeBytes);
 		}
 
 		[Fact]
@@ -170,7 +170,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 			Assert.Equal("Updated", updated.Description);
 			Assert.Equal(ETimeUnit.Weeks, updated.TimeUnit);
 			Assert.Equal("HUF", updated.Currency);
-			Assert.Equal(1, updated.LatestRevision.RevisionNumber);
+			Assert.Equal(1, updated.Diagram.FlowNodeCount);
 		}
 
 		[Fact]

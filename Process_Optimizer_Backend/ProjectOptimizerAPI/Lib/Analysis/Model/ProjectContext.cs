@@ -2,9 +2,8 @@ using ProjectOptimizerLib.Enum;
 
 namespace ProjectOptimizerAPI.Lib.Analysis.Model
 {
-	public sealed record RevisionContext(
+	public sealed record ProjectContext(
 		Guid ProjectId,
-		int RevisionNumber,
 		ETimeUnit TimeUnit,
 		string Currency);
 }

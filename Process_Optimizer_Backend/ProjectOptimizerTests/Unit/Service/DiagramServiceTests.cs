@@ -6,14 +6,13 @@ using ProjectOptimizerAPI.Lib.Helper;
 using ProjectOptimizerAPI.Lib.Service;
 using ProjectOptimizerLib.DTO;
 using ProjectOptimizerLib.Enum;
-using ProjectOptimizerLib.Model;
+using ProjectOptimizerLib.Model.Process;
 using ProjectOptimizerTests.Infrastructure;
 
 namespace ProjectOptimizerTests.Unit.Service
 {
 	public sealed class DiagramServiceTests : ServiceTestBase
 	{
-		private const string StaleRevisionMessage = "The diagram was changed by another session. Reload it before saving.";
 		private const string TooManyFlowNodesMessage = "The diagram must not contain more than 1000 flow nodes.";
 		private const string XmlTooLargeMessage = "The diagram XML must not be larger than 2 MB.";
 		private const string NotWellFormedMessage = "The diagram is not well-formed XML or contains a DTD.";
@@ -26,125 +25,96 @@ namespace ProjectOptimizerTests.Unit.Service
 
 		public DiagramServiceTests()
 		{
-			_service = new DiagramService(UnitOfWork, ProjectAccessGuard, Analysis.RevisionFactory, new ProcessJsonConverter(), TimeProvider);
+			_service = new DiagramService(UnitOfWork, ProjectAccessGuard, Analysis.DiagramFactory, new ProcessJsonConverter(), TimeProvider);
 		}
 
 		[Fact]
-		public async Task GetLatestDiagramAsync_NewProject_ReturnsRevisionOneWithDefaultXml()
+		public async Task GetDiagramAsync_NewProject_ReturnsDefaultXml()
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var revision = await _service.GetLatestDiagramAsync(project.Id);
+			var diagram = await _service.GetDiagramAsync(project.Id);
 
-			Assert.Equal(1, revision.RevisionNumber);
-			Assert.Equal(DefaultDiagram.Xml, revision.BpmnXml);
-			Assert.Equal(ContentHash.Sha256Hex(DefaultDiagram.Xml), revision.ContentSha256);
-			Assert.Equal(Encoding.UTF8.GetByteCount(DefaultDiagram.Xml), revision.SizeBytes);
+			Assert.Equal(DefaultDiagram.Xml, diagram.BpmnXml);
+			Assert.Equal(ContentHash.Sha256Hex(DefaultDiagram.Xml), diagram.ContentSha256);
+			Assert.Equal(Encoding.UTF8.GetByteCount(DefaultDiagram.Xml), diagram.SizeBytes);
+			Assert.Equal(FixedNow.UtcDateTime, diagram.UpdatedAt);
 		}
 
 		[Fact]
-		public async Task GetLatestDiagramAsync_AfterNewRevision_ReturnsNewestRevision()
+		public async Task GetDiagramAsync_AfterOverwrite_ReturnsCurrentDiagram()
 		{
 			var project = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
+			await TestData.SetDiagramAsync(project, BpmnFixtures.WorkedExample);
 
-			var revision = await _service.GetLatestDiagramAsync(project.Id);
+			var diagram = await _service.GetDiagramAsync(project.Id);
 
-			Assert.Equal(2, revision.RevisionNumber);
-			Assert.Equal(BpmnFixtures.WorkedExample, revision.BpmnXml);
+			Assert.Equal(BpmnFixtures.WorkedExample, diagram.BpmnXml);
+			Assert.Equal(12, diagram.FlowNodeCount);
 		}
 
 		[Fact]
-		public async Task GetLatestDiagramAsync_UnknownProject_ThrowsNotFound()
+		public async Task GetDiagramAsync_UnknownProject_ThrowsNotFound()
 		{
 			var projectId = Guid.NewGuid();
 
-			await Assert.ThrowsAsync<NotFoundException>(() => _service.GetLatestDiagramAsync(projectId));
+			await Assert.ThrowsAsync<NotFoundException>(() => _service.GetDiagramAsync(projectId));
 		}
 
 		[Fact]
-		public async Task SaveDiagramAsync_CurrentBaseRevision_AppendsRevisionTwo()
+		public async Task GetDiagramAsync_ProjectWithoutDiagram_ThrowsNotFound()
 		{
 			var project = await TestData.AddProjectAsync();
+			await DeleteDiagramAsync(project.Id);
 
-			var revision = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample, 1));
+			var exception = await Assert.ThrowsAsync<NotFoundException>(() => _service.GetDiagramAsync(project.Id));
 
-			Assert.Equal(2, revision.RevisionNumber);
-			Assert.Equal(BpmnFixtures.WorkedExample, revision.BpmnXml);
-			Assert.Equal(ContentHash.Sha256Hex(BpmnFixtures.WorkedExample), revision.ContentSha256);
-			Assert.Equal(Encoding.UTF8.GetByteCount(BpmnFixtures.WorkedExample), revision.SizeBytes);
-			Assert.Equal(12, revision.FlowNodeCount);
-			Assert.Equal(2, await CountRevisionsAsync(project.Id));
+			Assert.Equal(ErrorMessages.DiagramNotFound, exception.Message);
 		}
 
 		[Fact]
-		public async Task SaveDiagramAsync_IdenticalXml_StillAppendsRevision()
+		public async Task SaveDiagramAsync_ValidDiagram_OverwritesDiagram()
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var revision = await _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, 1));
+			var diagram = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample));
 
-			Assert.Equal(2, revision.RevisionNumber);
-			Assert.Equal(ContentHash.Sha256Hex(DefaultDiagram.Xml), revision.ContentSha256);
-			Assert.Equal(2, await CountRevisionsAsync(project.Id));
+			Assert.Equal(BpmnFixtures.WorkedExample, diagram.BpmnXml);
+			Assert.Equal(ContentHash.Sha256Hex(BpmnFixtures.WorkedExample), diagram.ContentSha256);
+			Assert.Equal(Encoding.UTF8.GetByteCount(BpmnFixtures.WorkedExample), diagram.SizeBytes);
+			Assert.Equal(12, diagram.FlowNodeCount);
+			Assert.Equal(BpmnFixtures.WorkedExample, (await LoadDiagramAsync(project.Id)).BpmnXml);
+			Assert.Equal(1, await CountDiagramsAsync(project.Id));
 		}
 
 		[Fact]
-		public async Task SaveDiagramAsync_ConsecutiveSaves_IncrementRevisionNumber()
+		public async Task SaveDiagramAsync_SecondSave_ReplacesXmlAndCounts()
 		{
 			var project = await TestData.AddProjectAsync();
-			await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample, 1));
+			await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample));
 
-			var revision = await _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, 2));
+			var diagram = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.DisconnectedDiagram()));
 
-			Assert.Equal(3, revision.RevisionNumber);
-			Assert.Equal(3, await CountRevisionsAsync(project.Id));
+			var stored = await LoadDiagramAsync(project.Id);
+			Assert.Equal(BpmnFixtures.DisconnectedDiagram(), diagram.BpmnXml);
+			Assert.Equal(3, diagram.FlowNodeCount);
+			Assert.True(diagram.ErrorCount > 0);
+			Assert.False(diagram.IsOptimizable);
+			Assert.Equal(diagram.BpmnXml, stored.BpmnXml);
+			Assert.Equal(diagram.ContentSha256, stored.ContentSha256);
+			Assert.Null(stored.MaxCost);
+			Assert.Equal(1, await CountDiagramsAsync(project.Id));
 		}
 
 		[Fact]
-		public async Task SaveDiagramAsync_StaleBaseRevision_ThrowsConflict()
-		{
-			var project = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
-
-			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, 1)));
-
-			Assert.Equal(StaleRevisionMessage, exception.Message);
-		}
-
-		[Fact]
-		public async Task SaveDiagramAsync_BaseRevisionAheadOfLatest_ThrowsConflict()
+		public async Task SaveDiagramAsync_IdenticalXml_KeepsSingleDiagram()
 		{
 			var project = await TestData.AddProjectAsync();
 
-			await Assert.ThrowsAsync<ConflictException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, 2)));
-		}
+			var diagram = await _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml));
 
-		[Fact]
-		public async Task SaveDiagramAsync_StaleBaseRevision_PersistsNothing()
-		{
-			var project = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
-			TimeProvider.Advance(SaveDelay);
-
-			await Assert.ThrowsAsync<ConflictException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, 1)));
-
-			Assert.Equal(2, await CountRevisionsAsync(project.Id));
-			var stored = await LoadProjectAsync(project.Id);
-			Assert.Equal(2, stored.LatestRevisionNumber);
-			Assert.Equal(FixedNow.UtcDateTime, stored.UpdatedAt);
-		}
-
-		[Fact]
-		public async Task SaveDiagramAsync_ConcurrentInsertOfSameRevisionNumber_ThrowsConflict()
-		{
-			var project = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
-			project.LatestRevisionNumber = 1;
-
-			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, 1)));
-
-			Assert.Equal(StaleRevisionMessage, exception.Message);
+			Assert.Equal(ContentHash.Sha256Hex(DefaultDiagram.Xml), diagram.ContentSha256);
+			Assert.Equal(1, await CountDiagramsAsync(project.Id));
 		}
 
 		[Fact]
@@ -152,11 +122,10 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var revision = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.DisconnectedDiagram(), 1));
+			var diagram = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.DisconnectedDiagram()));
 
-			Assert.Equal(2, revision.RevisionNumber);
-			Assert.True(revision.ErrorCount > 0);
-			Assert.False(revision.IsOptimizable);
+			Assert.True(diagram.ErrorCount > 0);
+			Assert.False(diagram.IsOptimizable);
 		}
 
 		[Fact]
@@ -164,9 +133,9 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var revision = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.DisconnectedDiagram(), 1));
+			await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.DisconnectedDiagram()));
 
-			var stored = await FindStoredRevisionAsync(project.Id, revision.RevisionNumber);
+			var stored = await LoadDiagramAsync(project.Id);
 			Assert.Null(stored.MaxCost);
 			Assert.Null(stored.MaxDurationBound);
 		}
@@ -176,10 +145,10 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var revision = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample, 1));
+			var diagram = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample));
 
-			Assert.True(revision.IsOptimizable);
-			Assert.Equal(0, revision.ErrorCount);
+			Assert.True(diagram.IsOptimizable);
+			Assert.Equal(0, diagram.ErrorCount);
 		}
 
 		[Fact]
@@ -187,9 +156,9 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var revision = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample, 1));
+			await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample));
 
-			var stored = await FindStoredRevisionAsync(project.Id, revision.RevisionNumber);
+			var stored = await LoadDiagramAsync(project.Id);
 			Assert.Equal(WorkedExampleMaxCost, stored.MaxCost);
 			Assert.NotNull(stored.MaxDurationBound);
 			Assert.True(stored.MaxDurationBound > 0);
@@ -200,7 +169,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var exception = await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(MalformedXml, 1)));
+			var exception = await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(MalformedXml)));
 
 			Assert.Equal(NotWellFormedMessage, exception.Message);
 		}
@@ -210,7 +179,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.Load("Parsing/xxe.bpmn"), 1)));
+			await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.Load("Parsing/xxe.bpmn"))));
 		}
 
 		[Fact]
@@ -218,7 +187,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var exception = await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(OversizedXml(), 1)));
+			var exception = await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(OversizedXml())));
 
 			Assert.Equal(XmlTooLargeMessage, exception.Message);
 		}
@@ -228,29 +197,26 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var exception = await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnDiagramBuilder.Chain(AnalysisLimits.MaxFlowNodes), 1)));
+			var exception = await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnDiagramBuilder.Chain(AnalysisLimits.MaxFlowNodes))));
 
 			Assert.Equal(TooManyFlowNodesMessage, exception.Message);
 		}
 
 		[Fact]
-		public async Task SaveDiagramAsync_InvalidXml_PersistsNothing()
+		public async Task SaveDiagramAsync_InvalidXml_LeavesStoredDiagramUnchanged()
 		{
 			var project = await TestData.AddProjectAsync();
+			await TestData.SetDiagramAsync(project, BpmnFixtures.WorkedExample);
+			TimeProvider.Advance(SaveDelay);
 
-			await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(MalformedXml, 1)));
+			await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(MalformedXml)));
 
-			Assert.Equal(1, await CountRevisionsAsync(project.Id));
-			Assert.Equal(1, (await LoadProjectAsync(project.Id)).LatestRevisionNumber);
-		}
-
-		[Fact]
-		public async Task SaveDiagramAsync_InvalidXmlWithStaleBaseRevision_ThrowsInvalidRequestBeforeConflict()
-		{
-			var project = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
-
-			await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveDiagramAsync(project.Id, SaveRequest(MalformedXml, 1)));
+			var stored = await LoadDiagramAsync(project.Id);
+			Assert.Equal(BpmnFixtures.WorkedExample, stored.BpmnXml);
+			Assert.Equal(ContentHash.Sha256Hex(BpmnFixtures.WorkedExample), stored.ContentSha256);
+			Assert.Equal(12, stored.FlowNodeCount);
+			Assert.Equal(FixedNow.UtcDateTime, stored.UpdatedAt);
+			Assert.Equal(FixedNow.UtcDateTime, (await LoadProjectAsync(project.Id)).UpdatedAt);
 		}
 
 		[Fact]
@@ -258,157 +224,41 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var projectId = Guid.NewGuid();
 
-			await Assert.ThrowsAsync<NotFoundException>(() => _service.SaveDiagramAsync(projectId, SaveRequest(MalformedXml, 1)));
+			await Assert.ThrowsAsync<NotFoundException>(() => _service.SaveDiagramAsync(projectId, SaveRequest(MalformedXml)));
 		}
 
 		[Fact]
-		public async Task SaveDiagramAsync_ValidDiagram_UpdatesLatestRevisionNumberAndTimestamp()
+		public async Task SaveDiagramAsync_ValidDiagram_UpdatesTimestamps()
 		{
 			var project = await TestData.AddProjectAsync();
 			TimeProvider.Advance(SaveDelay);
 
-			var revision = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample, 1));
+			var diagram = await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample));
 
 			var expectedTime = FixedNow.Add(SaveDelay).UtcDateTime;
 			var stored = await LoadProjectAsync(project.Id);
-			Assert.Equal(2, stored.LatestRevisionNumber);
 			Assert.Equal(expectedTime, stored.UpdatedAt);
 			Assert.Equal(FixedNow.UtcDateTime, stored.CreatedAt);
-			Assert.Equal(expectedTime, revision.CreatedAt);
+			Assert.Equal(expectedTime, diagram.UpdatedAt);
+			Assert.Equal(expectedTime, (await LoadDiagramAsync(project.Id)).UpdatedAt);
 		}
 
 		[Fact]
-		public async Task SaveDiagramAsync_FiftiethRevision_PrunesNothing()
-		{
-			var project = await TestData.AddProjectAsync();
-			await AddRevisionsUpToAsync(project, AnalysisLimits.RevisionsToKeep - 1);
-
-			await _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, AnalysisLimits.RevisionsToKeep - 1));
-
-			Assert.Equal(AnalysisLimits.RevisionsToKeep, await CountRevisionsAsync(project.Id));
-			Assert.True(await RevisionExistsAsync(project.Id, 1));
-		}
-
-		[Fact]
-		public async Task SaveDiagramAsync_FiftyFirstRevision_PrunesOldestUnreferencedRevision()
-		{
-			var project = await TestData.AddProjectAsync();
-			await AddRevisionsUpToAsync(project, AnalysisLimits.RevisionsToKeep);
-
-			await _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, AnalysisLimits.RevisionsToKeep));
-
-			Assert.Equal(AnalysisLimits.RevisionsToKeep, await CountRevisionsAsync(project.Id));
-			Assert.False(await RevisionExistsAsync(project.Id, 1));
-			Assert.True(await RevisionExistsAsync(project.Id, 2));
-			Assert.True(await RevisionExistsAsync(project.Id, AnalysisLimits.RevisionsToKeep + 1));
-		}
-
-		[Fact]
-		public async Task SaveDiagramAsync_RevisionReferencedBySavedScenario_IsKept()
-		{
-			var project = await TestData.AddProjectAsync();
-			await TestData.AddSavedScenarioAsync(project, 1, $"Scenario {Guid.NewGuid():N}");
-			await AddRevisionsUpToAsync(project, AnalysisLimits.RevisionsToKeep);
-
-			await _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, AnalysisLimits.RevisionsToKeep));
-
-			Assert.Equal(AnalysisLimits.RevisionsToKeep + 1, await CountRevisionsAsync(project.Id));
-			Assert.True(await RevisionExistsAsync(project.Id, 1));
-		}
-
-		[Fact]
-		public async Task SaveDiagramAsync_SavedScenarioOfOtherProject_DoesNotProtectRevision()
-		{
-			var otherProject = await TestData.AddProjectAsync();
-			await TestData.AddSavedScenarioAsync(otherProject, 1, $"Scenario {Guid.NewGuid():N}");
-			var project = await TestData.AddProjectAsync();
-			await AddRevisionsUpToAsync(project, AnalysisLimits.RevisionsToKeep);
-
-			await _service.SaveDiagramAsync(project.Id, SaveRequest(DefaultDiagram.Xml, AnalysisLimits.RevisionsToKeep));
-
-			Assert.False(await RevisionExistsAsync(project.Id, 1));
-			Assert.True(await RevisionExistsAsync(otherProject.Id, 1));
-		}
-
-		[Fact]
-		public async Task ListRevisionsAsync_SeveralRevisions_ReturnsNewestFirst()
-		{
-			var project = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
-			await TestData.AddRevisionAsync(project, DefaultDiagram.Xml);
-
-			var revisions = await _service.ListRevisionsAsync(project.Id);
-
-			Assert.Equal(new[] { 3, 2, 1 }, revisions.Select(revision => revision.RevisionNumber));
-			Assert.Equal(12, revisions[1].FlowNodeCount);
-			Assert.True(revisions[1].IsOptimizable);
-		}
-
-		[Fact]
-		public async Task ListRevisionsAsync_OtherProjectRevisions_AreExcluded()
+		public async Task SaveDiagramAsync_OtherProjectDiagram_IsNotChanged()
 		{
 			var project = await TestData.AddProjectAsync();
 			var otherProject = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(otherProject, BpmnFixtures.WorkedExample);
 
-			var revisions = await _service.ListRevisionsAsync(project.Id);
+			await _service.SaveDiagramAsync(project.Id, SaveRequest(BpmnFixtures.WorkedExample));
 
-			Assert.Equal(1, Assert.Single(revisions).RevisionNumber);
+			Assert.Equal(DefaultDiagram.Xml, (await LoadDiagramAsync(otherProject.Id)).BpmnXml);
 		}
 
 		[Fact]
-		public async Task ListRevisionsAsync_UnknownProject_ThrowsNotFound()
-		{
-			var projectId = Guid.NewGuid();
-
-			await Assert.ThrowsAsync<NotFoundException>(() => _service.ListRevisionsAsync(projectId));
-		}
-
-		[Fact]
-		public async Task GetRevisionAsync_ExistingNumber_ReturnsThatRevision()
-		{
-			var project = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
-
-			var revision = await _service.GetRevisionAsync(project.Id, 1);
-
-			Assert.Equal(1, revision.RevisionNumber);
-			Assert.Equal(DefaultDiagram.Xml, revision.BpmnXml);
-		}
-
-		[Fact]
-		public async Task GetRevisionAsync_UnknownNumber_ThrowsNotFound()
-		{
-			var project = await TestData.AddProjectAsync();
-
-			var exception = await Assert.ThrowsAsync<NotFoundException>(() => _service.GetRevisionAsync(project.Id, 2));
-
-			Assert.Equal(ErrorMessages.RevisionNotFound, exception.Message);
-		}
-
-		[Fact]
-		public async Task GetRevisionAsync_RevisionOfOtherProject_ThrowsNotFound()
-		{
-			var project = await TestData.AddProjectAsync();
-			var otherProject = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(otherProject, BpmnFixtures.WorkedExample);
-
-			await Assert.ThrowsAsync<NotFoundException>(() => _service.GetRevisionAsync(project.Id, 2));
-		}
-
-		[Fact]
-		public async Task GetRevisionAsync_UnknownProject_ThrowsNotFound()
-		{
-			var projectId = Guid.NewGuid();
-
-			await Assert.ThrowsAsync<NotFoundException>(() => _service.GetRevisionAsync(projectId, 1));
-		}
-
-		[Fact]
-		public async Task GetDiagramFileAsync_ExistingProject_ReturnsLatestXmlAndBpmnFileName()
+		public async Task GetDiagramFileAsync_ExistingProject_ReturnsCurrentXmlAndBpmnFileName()
 		{
 			var project = await TestData.AddProjectAsync(name: "Roadmap 2026");
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
+			await TestData.SetDiagramAsync(project, BpmnFixtures.WorkedExample);
 
 			var file = await _service.GetDiagramFileAsync(project.Id);
 
@@ -435,57 +285,45 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task SaveJsonDiagramAsync_CurrentBaseRevision_AppendsConvertedRevision()
+		public async Task SaveJsonDiagramAsync_SampleDiagram_OverwritesWithConvertedXml()
 		{
 			var project = await TestData.AddProjectAsync();
 
-			var revision = await _service.SaveJsonDiagramAsync(project.Id, JsonSaveRequest(1));
+			var diagram = await _service.SaveJsonDiagramAsync(project.Id, JsonSaveRequest());
 
-			Assert.Equal(2, revision.RevisionNumber);
-			Assert.Equal(3, revision.FlowNodeCount);
-			Assert.True(revision.IsOptimizable);
-			Assert.Equal(0, revision.WarningCount);
-			Assert.Contains("po:duration=\"0.010417\"", revision.BpmnXml);
-			Assert.Equal(2, await CountRevisionsAsync(project.Id));
+			Assert.Equal(3, diagram.FlowNodeCount);
+			Assert.True(diagram.IsOptimizable);
+			Assert.Equal(0, diagram.WarningCount);
+			Assert.Contains("po:duration=\"0.010417\"", diagram.BpmnXml);
+			Assert.Equal(diagram.BpmnXml, (await LoadDiagramAsync(project.Id)).BpmnXml);
+			Assert.Equal(1, await CountDiagramsAsync(project.Id));
 		}
 
 		[Fact]
 		public async Task SaveJsonDiagramAsync_ProjectInHoursAndUsd_ConvertsWithProjectSettings()
 		{
 			var project = await TestData.AddProjectAsync(timeUnit: ETimeUnit.Hours, currency: "USD");
-			var request = JsonSaveRequest(1);
-			request.States![1].Price = "$12.50";
+			var request = JsonSaveRequest();
+			request.States[1].Price = "$12.50";
 
-			var revision = await _service.SaveJsonDiagramAsync(project.Id, request);
+			var diagram = await _service.SaveJsonDiagramAsync(project.Id, request);
 
-			Assert.Contains("po:duration=\"0.25\"", revision.BpmnXml);
-			Assert.Contains("po:cost=\"12.5\"", revision.BpmnXml);
-			Assert.Equal(0, revision.ErrorCount);
+			Assert.Contains("po:duration=\"0.25\"", diagram.BpmnXml);
+			Assert.Contains("po:cost=\"12.5\"", diagram.BpmnXml);
+			Assert.Equal(0, diagram.ErrorCount);
 		}
 
 		[Fact]
-		public async Task SaveJsonDiagramAsync_StaleBaseRevision_ThrowsConflictAndPersistsNothing()
+		public async Task SaveJsonDiagramAsync_InvalidId_ThrowsInvalidRequestAndLeavesDiagramUnchanged()
 		{
 			var project = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
-
-			var exception = await Assert.ThrowsAsync<ConflictException>(() => _service.SaveJsonDiagramAsync(project.Id, JsonSaveRequest(1)));
-
-			Assert.Equal(StaleRevisionMessage, exception.Message);
-			Assert.Equal(2, await CountRevisionsAsync(project.Id));
-		}
-
-		[Fact]
-		public async Task SaveJsonDiagramAsync_InvalidIdWithStaleBaseRevision_ThrowsInvalidRequestBeforeConflict()
-		{
-			var project = await TestData.AddProjectAsync();
-			await TestData.AddRevisionAsync(project, BpmnFixtures.WorkedExample);
-			var request = JsonSaveRequest(1);
-			request.States![0].Id = "1 bad";
+			await TestData.SetDiagramAsync(project, BpmnFixtures.WorkedExample);
+			var request = JsonSaveRequest();
+			request.States[0].Id = "1 bad";
 
 			await Assert.ThrowsAsync<InvalidRequestException>(() => _service.SaveJsonDiagramAsync(project.Id, request));
 
-			Assert.Equal(2, await CountRevisionsAsync(project.Id));
+			Assert.Equal(BpmnFixtures.WorkedExample, (await LoadDiagramAsync(project.Id)).BpmnXml);
 		}
 
 		[Fact]
@@ -493,33 +331,22 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var projectId = Guid.NewGuid();
 
-			await Assert.ThrowsAsync<NotFoundException>(() => _service.SaveJsonDiagramAsync(projectId, JsonSaveRequest(1)));
+			await Assert.ThrowsAsync<NotFoundException>(() => _service.SaveJsonDiagramAsync(projectId, JsonSaveRequest()));
 		}
 
-		private static DiagramJsonRevisionCreateDTO JsonSaveRequest(int baseRevision) =>
-			new() { States = ProcessJsonFixtures.SampleStates(), Branches = ProcessJsonFixtures.SampleBranches(), BaseRevision = baseRevision };
+		private static ProcessDiagram JsonSaveRequest() =>
+			ProcessJsonFixtures.Diagram(ProcessJsonFixtures.SampleStates(), ProcessJsonFixtures.SampleBranches());
 
-		private static DiagramRevisionCreateDTO SaveRequest(string bpmnXml, int baseRevision) =>
-			new() { BpmnXml = bpmnXml, BaseRevision = baseRevision };
+		private static DiagramSaveDTO SaveRequest(string bpmnXml) =>
+			new() { BpmnXml = bpmnXml };
 
 		private static string OversizedXml() =>
 			DefaultDiagram.Xml + $"<!--{new string('x', AnalysisLimits.MaxXmlBytes)}-->";
 
-		private async Task AddRevisionsUpToAsync(Project project, int latestRevisionNumber)
-		{
-			while (project.LatestRevisionNumber < latestRevisionNumber)
-			{
-				await TestData.AddRevisionAsync(project, DefaultDiagram.Xml);
-			}
-		}
+		private Task<int> CountDiagramsAsync(Guid projectId) =>
+			DbContext.Diagrams.CountAsync(diagram => diagram.ProjectId == projectId);
 
-		private Task<int> CountRevisionsAsync(Guid projectId) =>
-			DbContext.DiagramRevisions.CountAsync(revision => revision.ProjectId == projectId);
-
-		private Task<bool> RevisionExistsAsync(Guid projectId, int revisionNumber) =>
-			DbContext.DiagramRevisions.AnyAsync(revision => revision.ProjectId == projectId && revision.RevisionNumber == revisionNumber);
-
-		private Task<DiagramRevision> FindStoredRevisionAsync(Guid projectId, int revisionNumber) =>
-			DbContext.DiagramRevisions.AsNoTracking().SingleAsync(revision => revision.ProjectId == projectId && revision.RevisionNumber == revisionNumber);
+		private Task<int> DeleteDiagramAsync(Guid projectId) =>
+			DbContext.Diagrams.Where(diagram => diagram.ProjectId == projectId).ExecuteDeleteAsync();
 	}
 }

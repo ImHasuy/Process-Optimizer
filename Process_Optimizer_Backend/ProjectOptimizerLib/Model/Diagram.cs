@@ -1,11 +1,10 @@
 namespace ProjectOptimizerLib.Model
 {
-	public class DiagramRevision
+	/// <summary>The current diagram of a project. Each project has exactly one; saving overwrites it.</summary>
+	public class Diagram
 	{
-		public Guid Id { get; set; }
 		public Guid ProjectId { get; set; }
 		public Project Project { get; set; } = null!;
-		public int RevisionNumber { get; set; }
 		public string BpmnXml { get; set; } = string.Empty;
 		public string ContentSha256 { get; set; } = string.Empty;
 		public int SizeBytes { get; set; }
@@ -15,6 +14,6 @@ namespace ProjectOptimizerLib.Model
 		public bool IsOptimizable { get; set; }
 		public decimal? MaxCost { get; set; }
 		public decimal? MaxDurationBound { get; set; }
-		public DateTime CreatedAt { get; set; }
+		public DateTime UpdatedAt { get; set; }
 	}
 }

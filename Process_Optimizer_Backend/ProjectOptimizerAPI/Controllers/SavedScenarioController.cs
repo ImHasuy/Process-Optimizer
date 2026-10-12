@@ -7,12 +7,12 @@ namespace ProjectOptimizerAPI.Controllers
 	[Route("api/projects/{projectId:guid}/saved-scenarios")]
 	public sealed class SavedScenarioController(ISavedScenarioService savedScenarioService) : ApiControllerBase
 	{
-		/// <summary>Saves a snapshot of one scenario of a diagram revision under a name unique within the project.</summary>
+		/// <summary>Saves a snapshot of one scenario of the project's diagram under a name unique within the project.</summary>
 		/// <param name="projectId">The identifier of the project.</param>
-		/// <param name="request">The scenario index, the optional revision number (latest when omitted), the name and an optional note.</param>
+		/// <param name="request">The scenario index, the name and an optional note.</param>
 		/// <returns>The saved scenario with its frozen snapshot.</returns>
 		/// <response code="201">The scenario was saved.</response>
-		/// <response code="400">The request body is invalid, the revision does not exist or the scenario index is not below the scenario count.</response>
+		/// <response code="400">The request body is invalid or the scenario index is not below the scenario count.</response>
 		/// <response code="404">No project exists with the given identifier.</response>
 		/// <response code="409">The name is already used by another saved scenario of the project, or the diagram cannot be enumerated into scenarios.</response>
 		[HttpPost]
@@ -26,7 +26,7 @@ namespace ProjectOptimizerAPI.Controllers
 			return Created(nameof(GetSavedScenario), new { projectId, id = saved.Id }, saved);
 		}
 
-		/// <summary>Lists the saved scenarios of a project, newest first, with their availability in the latest revision.</summary>
+		/// <summary>Lists the saved scenarios of a project, newest first, with whether they still exist in the current diagram.</summary>
 		/// <param name="projectId">The identifier of the project.</param>
 		/// <returns>The saved scenarios of the project.</returns>
 		/// <response code="200">The list of saved scenarios, possibly empty.</response>
@@ -37,7 +37,7 @@ namespace ProjectOptimizerAPI.Controllers
 		public async Task<IActionResult> ListSavedScenarios(Guid projectId) =>
 			Success(await savedScenarioService.ListSavedScenariosAsync(projectId));
 
-		/// <summary>Returns one saved scenario with its unchanged snapshot and its index in the latest revision.</summary>
+		/// <summary>Returns one saved scenario with its unchanged snapshot and its index in the current diagram.</summary>
 		/// <param name="projectId">The identifier of the project.</param>
 		/// <param name="id">The identifier of the saved scenario.</param>
 		/// <returns>The requested saved scenario.</returns>

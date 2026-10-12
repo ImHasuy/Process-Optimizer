@@ -8,13 +8,10 @@ namespace ProjectOptimizerTests.Integration.Controller
 {
 	public sealed class ScenarioControllerTests(ApiWebApplicationFactory factory) : IClassFixture<ApiWebApplicationFactory>
 	{
-		private const int InitialRevision = 1;
-		private const int WorkedExampleRevision = 2;
-
 		private readonly HttpClient _client = factory.CreateClient();
 
 		[Fact]
-		public async Task GetScenarioCount_WorkedExampleRevision_ReturnsTwo()
+		public async Task GetScenarioCount_WorkedExample_ReturnsTwo()
 		{
 			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);
 
@@ -24,7 +21,6 @@ namespace ProjectOptimizerTests.Integration.Controller
 			var body = await response.ReadApiResponseAsync<ScenarioCountDTO>();
 			Assert.Equal((int)HttpStatusCode.OK, body.StatusCode);
 			Assert.Equal(2, body.Data!.Count);
-			Assert.Equal(WorkedExampleRevision, body.Data.RevisionNumber);
 			Assert.Equal(1, body.Data.OrderingVersion);
 		}
 
@@ -46,26 +42,6 @@ namespace ProjectOptimizerTests.Integration.Controller
 			var response = await _client.GetAsync(ScenarioCountUrl(projectId));
 
 			await response.AssertApiErrorAsync(HttpStatusCode.Conflict, ErrorMessages.TooManyScenarios);
-		}
-
-		[Fact]
-		public async Task GetScenarioCount_UnknownRevision_ReturnsBadRequest()
-		{
-			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);
-
-			var response = await _client.GetAsync($"{ScenarioCountUrl(projectId)}?revision=99");
-
-			await response.AssertApiErrorAsync(HttpStatusCode.BadRequest, ErrorMessages.RevisionNotFound);
-		}
-
-		[Fact]
-		public async Task GetScenarioCount_RevisionZero_ReturnsBadRequestWithErrors()
-		{
-			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);
-
-			var response = await _client.GetAsync($"{ScenarioCountUrl(projectId)}?revision=0");
-
-			await response.AssertValidationErrorAsync("Revision");
 		}
 
 		[Fact]
@@ -115,11 +91,12 @@ namespace ProjectOptimizerTests.Integration.Controller
 		}
 
 		[Fact]
-		public async Task GetScenario_RevisionWithErrors_ReturnsConflict()
+		public async Task GetScenario_DiagramOverwrittenWithErrors_ReturnsConflict()
 		{
 			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);
+			await _client.SaveDiagramAsync(projectId, BpmnFixtures.DisconnectedDiagram());
 
-			var response = await _client.GetAsync($"{ScenarioUrl(projectId, 0)}?revision={InitialRevision}");
+			var response = await _client.GetAsync(ScenarioUrl(projectId, 0));
 
 			await response.AssertApiErrorAsync(HttpStatusCode.Conflict, ErrorMessages.DiagramHasErrors);
 		}
@@ -151,7 +128,6 @@ namespace ProjectOptimizerTests.Integration.Controller
 		[InlineData("pageSize=0", "PageSize")]
 		[InlineData("pageSize=101", "PageSize")]
 		[InlineData("page=0", "Page")]
-		[InlineData("revision=0", "Revision")]
 		public async Task ListScenarios_InvalidQuery_ReturnsBadRequestWithErrors(string query, string field)
 		{
 			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);
@@ -180,7 +156,7 @@ namespace ProjectOptimizerTests.Integration.Controller
 		}
 
 		[Fact]
-		public async Task GetResourceLimits_WorkedExampleRevision_ReturnsGoldenLimits()
+		public async Task GetResourceLimits_WorkedExample_ReturnsGoldenLimits()
 		{
 			var projectId = await _client.CreateProjectWithDiagramAsync(BpmnFixtures.WorkedExample);
 

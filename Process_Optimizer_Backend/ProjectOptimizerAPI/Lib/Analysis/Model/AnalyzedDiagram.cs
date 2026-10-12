@@ -1,6 +1,6 @@
 namespace ProjectOptimizerAPI.Lib.Analysis.Model
 {
-	public sealed record AnalyzedRevision(
-		ResolvedRevision Revision,
+	public sealed record AnalyzedDiagram(
+		ResolvedDiagram Diagram,
 		DiagramAnalysis Analysis);
 }

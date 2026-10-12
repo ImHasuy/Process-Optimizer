@@ -8,7 +8,7 @@ using ProjectOptimizerLib.Model;
 
 namespace ProjectOptimizerTests.Infrastructure
 {
-	public sealed class TestDataBuilder(ProjectOptimizerDbContext dbContext, DateTime now, IDiagramRevisionFactory revisionFactory)
+	public sealed class TestDataBuilder(ProjectOptimizerDbContext dbContext, DateTime now, IDiagramFactory diagramFactory)
 	{
 		private const string DefaultCurrency = "EUR";
 
@@ -22,26 +22,23 @@ namespace ProjectOptimizerTests.Infrastructure
 				NormalizedName = NameNormalizer.Normalize(projectName),
 				TimeUnit = timeUnit,
 				Currency = currency,
-				LatestRevisionNumber = 1,
 				CreatedAt = now,
 				UpdatedAt = now
 			};
-			project.Revisions.Add(revisionFactory.Create(project.Id, 1, bpmnXml ?? DefaultDiagram.Xml, now));
+			project.Diagram = diagramFactory.Create(project.Id, bpmnXml ?? DefaultDiagram.Xml, now);
 			dbContext.Projects.Add(project);
 			await dbContext.SaveChangesAsync();
 			return project;
 		}
 
-		public async Task<DiagramRevision> AddRevisionAsync(Project project, string bpmnXml)
+		public async Task<Diagram> SetDiagramAsync(Project project, string bpmnXml)
 		{
-			var revision = revisionFactory.Create(project.Id, project.LatestRevisionNumber + 1, bpmnXml, now);
-			dbContext.DiagramRevisions.Add(revision);
-			project.LatestRevisionNumber = revision.RevisionNumber;
+			diagramFactory.Apply(project.Diagram, bpmnXml, now);
 			await dbContext.SaveChangesAsync();
-			return revision;
+			return project.Diagram;
 		}
 
-		public async Task<SavedScenario> AddSavedScenarioAsync(Project project, int revisionNumber, string name, long scenarioIndex = 0, string scenarioKey = "")
+		public async Task<SavedScenario> AddSavedScenarioAsync(Project project, string name, long scenarioIndex = 0, string scenarioKey = "")
 		{
 			var savedScenario = new SavedScenario
 			{
@@ -49,11 +46,10 @@ namespace ProjectOptimizerTests.Infrastructure
 				ProjectId = project.Id,
 				Name = name,
 				NormalizedName = NameNormalizer.Normalize(name),
-				RevisionNumber = revisionNumber,
 				ScenarioIndex = scenarioIndex,
 				OrderingVersion = AnalysisLimits.OrderingVersion,
 				ScenarioKey = scenarioKey,
-				SnapshotJson = ScenarioSnapshotSerializer.Serialize(CreateSnapshot(project, revisionNumber, scenarioIndex, scenarioKey)),
+				SnapshotJson = ScenarioSnapshotSerializer.Serialize(CreateSnapshot(project, scenarioIndex, scenarioKey)),
 				CreatedAt = now
 			};
 			dbContext.SavedScenarios.Add(savedScenario);
@@ -61,11 +57,10 @@ namespace ProjectOptimizerTests.Infrastructure
 			return savedScenario;
 		}
 
-		private static ScenarioDTO CreateSnapshot(Project project, int revisionNumber, long scenarioIndex, string scenarioKey) =>
+		private static ScenarioDTO CreateSnapshot(Project project, long scenarioIndex, string scenarioKey) =>
 			new()
 			{
 				ProjectId = project.Id,
-				RevisionNumber = revisionNumber,
 				OrderingVersion = AnalysisLimits.OrderingVersion,
 				Index = scenarioIndex,
 				Count = 1,

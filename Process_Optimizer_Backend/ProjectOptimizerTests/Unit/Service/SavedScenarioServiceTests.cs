@@ -20,8 +20,8 @@ namespace ProjectOptimizerTests.Unit.Service
 		private SavedScenarioService CreateService() =>
 			new(UnitOfWork, ProjectAccessGuard, ScenarioCatalog, Analysis.Analyzer, Analysis.ScenarioBuilder, TimeProvider);
 
-		private static SavedScenarioCreateDTO CreateRequest(long scenarioIndex, string name, int? revision = null, string? note = null) =>
-			new() { ScenarioIndex = scenarioIndex, Name = name, Revision = revision, Note = note };
+		private static SavedScenarioCreateDTO CreateRequest(long scenarioIndex, string name, string? note = null) =>
+			new() { ScenarioIndex = scenarioIndex, Name = name, Note = note };
 
 		private static SavedScenarioUpdateDTO UpdateRequest(string name, string? note = null) =>
 			new() { Name = name, Note = note };
@@ -50,7 +50,7 @@ namespace ProjectOptimizerTests.Unit.Service
 
 		private async Task<long> IndexOfScenarioThroughTaskAsync(Project project, string taskId)
 		{
-			var indexed = await ScenarioCatalog.GetIndexedRevisionAsync(project.Id, null);
+			var indexed = await ScenarioCatalog.GetIndexedDiagramAsync(project.Id);
 			for (long index = 0; index < indexed.Count; index++)
 			{
 				if (Analysis.Analyzer.GetScenario(indexed.Analysis, index).ElementIds.Contains(taskId))
@@ -67,11 +67,10 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: FourScenarioDiagram);
 
-			var saved = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(2, "  Fast path  ", 1, "A note"));
+			var saved = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(2, "  Fast path  ", "A note"));
 
 			Assert.Equal("Fast path", saved.Name);
 			Assert.Equal("A note", saved.Note);
-			Assert.Equal(1, saved.RevisionNumber);
 			Assert.Equal(2, saved.ScenarioIndex);
 			Assert.Equal(1, saved.OrderingVersion);
 			Assert.Equal(FixedNow.UtcDateTime, saved.CreatedAt);
@@ -80,8 +79,8 @@ namespace ProjectOptimizerTests.Unit.Service
 			Assert.Equal(project.Id, saved.Snapshot.ProjectId);
 			Assert.Equal(saved.Snapshot.Key, saved.ScenarioKey);
 			Assert.NotEmpty(saved.ScenarioKey);
-			Assert.True(saved.IsAvailableInLatestRevision);
-			Assert.Equal(2, saved.LatestRevisionIndex);
+			Assert.True(saved.IsAvailable);
+			Assert.Equal(2, saved.CurrentIndex);
 		}
 
 		[Fact]
@@ -101,28 +100,15 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task CreateSavedScenarioAsync_WithoutRevision_UsesLatestRevision()
+		public async Task CreateSavedScenarioAsync_AfterDiagramOverwrite_UsesCurrentDiagram()
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
-			await TestData.AddRevisionAsync(project, FourScenarioDiagram);
+			await TestData.SetDiagramAsync(project, FourScenarioDiagram);
 
-			var saved = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(3, "Latest"));
+			var saved = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(3, "Current"));
 
-			Assert.Equal(2, saved.RevisionNumber);
-			Assert.Equal(2, saved.Snapshot.RevisionNumber);
+			Assert.Equal(3, saved.ScenarioIndex);
 			Assert.Equal(4, saved.Snapshot.Count);
-		}
-
-		[Fact]
-		public async Task CreateSavedScenarioAsync_OlderRevision_SnapshotsThatRevision()
-		{
-			var project = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
-			await TestData.AddRevisionAsync(project, FourScenarioDiagram);
-
-			var saved = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(1, "Older", 1));
-
-			Assert.Equal(1, saved.RevisionNumber);
-			Assert.Equal(2, saved.Snapshot.Count);
 		}
 
 		[Fact]
@@ -144,15 +130,6 @@ namespace ProjectOptimizerTests.Unit.Service
 				CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(4, "Out of range")));
 
 			Assert.False(await DbContext.SavedScenarios.AnyAsync());
-		}
-
-		[Fact]
-		public async Task CreateSavedScenarioAsync_UnknownRevision_ThrowsInvalidRequest()
-		{
-			var project = await TestData.AddProjectAsync(bpmnXml: FourScenarioDiagram);
-
-			await Assert.ThrowsAsync<InvalidRequestException>(() =>
-				CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(0, "Missing revision", 5)));
 		}
 
 		[Fact]
@@ -222,46 +199,45 @@ namespace ProjectOptimizerTests.Unit.Service
 		}
 
 		[Fact]
-		public async Task GetSavedScenarioAsync_LatestRevisionStillContainsKey_ReportsLatestIndex()
+		public async Task GetSavedScenarioAsync_CurrentDiagramStillContainsKey_ReportsCurrentIndex()
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
 			var indexOfB = await IndexOfScenarioThroughTaskAsync(project, "TaskB");
 			var saved = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(indexOfB, "Through B"));
-			await TestData.AddRevisionAsync(project, SingleChoiceDiagram("TaskC", "TaskB", "TaskA"));
-			var latestIndexOfB = await IndexOfScenarioThroughTaskAsync(project, "TaskB");
+			await TestData.SetDiagramAsync(project, SingleChoiceDiagram("TaskC", "TaskB", "TaskA"));
+			var currentIndexOfB = await IndexOfScenarioThroughTaskAsync(project, "TaskB");
 
 			var result = await CreateService().GetSavedScenarioAsync(project.Id, saved.Id);
 
-			Assert.True(result.IsAvailableInLatestRevision);
-			Assert.Equal(latestIndexOfB, result.LatestRevisionIndex);
-			Assert.Equal(1, result.RevisionNumber);
+			Assert.True(result.IsAvailable);
+			Assert.Equal(currentIndexOfB, result.CurrentIndex);
 		}
 
 		[Fact]
-		public async Task GetSavedScenarioAsync_ChosenTargetRemovedInLatest_ReportsUnavailable()
+		public async Task GetSavedScenarioAsync_ChosenTargetRemovedFromDiagram_ReportsUnavailable()
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
 			var indexOfB = await IndexOfScenarioThroughTaskAsync(project, "TaskB");
 			var saved = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(indexOfB, "Through B"));
-			await TestData.AddRevisionAsync(project, SingleChoiceDiagram("TaskA", "TaskC"));
+			await TestData.SetDiagramAsync(project, SingleChoiceDiagram("TaskA", "TaskC"));
 
 			var result = await CreateService().GetSavedScenarioAsync(project.Id, saved.Id);
 
-			Assert.False(result.IsAvailableInLatestRevision);
-			Assert.Null(result.LatestRevisionIndex);
+			Assert.False(result.IsAvailable);
+			Assert.Null(result.CurrentIndex);
 		}
 
 		[Fact]
-		public async Task GetSavedScenarioAsync_LatestRevisionHasErrors_ReportsUnavailable()
+		public async Task GetSavedScenarioAsync_DiagramHasErrors_ReportsUnavailable()
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
 			var saved = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(0, "Before break"));
-			await TestData.AddRevisionAsync(project, DefaultDiagram.Xml);
+			await TestData.SetDiagramAsync(project, DefaultDiagram.Xml);
 
 			var result = await CreateService().GetSavedScenarioAsync(project.Id, saved.Id);
 
-			Assert.False(result.IsAvailableInLatestRevision);
-			Assert.Null(result.LatestRevisionIndex);
+			Assert.False(result.IsAvailable);
+			Assert.Null(result.CurrentIndex);
 		}
 
 		[Fact]
@@ -269,11 +245,10 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
 			var saved = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(1, "Frozen"));
-			await TestData.AddRevisionAsync(project, FourScenarioDiagram);
+			await TestData.SetDiagramAsync(project, FourScenarioDiagram);
 
 			var result = await CreateService().GetSavedScenarioAsync(project.Id, saved.Id);
 
-			Assert.Equal(1, result.Snapshot.RevisionNumber);
 			Assert.Equal(2, result.Snapshot.Count);
 			Assert.Equal(saved.Snapshot.Key, result.Snapshot.Key);
 			Assert.Equal(saved.Snapshot.ElementIds, result.Snapshot.ElementIds);
@@ -294,7 +269,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var owner = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
 			var other = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
-			var saved = await TestData.AddSavedScenarioAsync(owner, 1, "Owned");
+			var saved = await TestData.AddSavedScenarioAsync(owner, "Owned");
 
 			await Assert.ThrowsAsync<NotFoundException>(() => CreateService().GetSavedScenarioAsync(other.Id, saved.Id));
 		}
@@ -314,13 +289,13 @@ namespace ProjectOptimizerTests.Unit.Service
 			var throughA = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(indexOfA, "Through A"));
 			TimeProvider.Advance(TimeSpan.FromMinutes(5));
 			var throughB = await CreateService().CreateSavedScenarioAsync(project.Id, CreateRequest(indexOfB, "Through B"));
-			await TestData.AddRevisionAsync(project, SingleChoiceDiagram("TaskA", "TaskC"));
+			await TestData.SetDiagramAsync(project, SingleChoiceDiagram("TaskA", "TaskC"));
 
 			var result = await CreateService().ListSavedScenariosAsync(project.Id);
 
 			Assert.Equal([throughB.Id, throughA.Id], result.Select(item => item.Id));
-			Assert.False(result[0].IsAvailableInLatestRevision);
-			Assert.True(result[1].IsAvailableInLatestRevision);
+			Assert.False(result[0].IsAvailable);
+			Assert.True(result[1].IsAvailable);
 			Assert.Equal(throughB.Snapshot.TotalCost, result[0].TotalCost);
 			Assert.Equal(throughB.Snapshot.TotalDuration, result[0].TotalDuration);
 			Assert.Equal(throughB.ScenarioKey, result[0].ScenarioKey);
@@ -331,7 +306,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var project = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
 			var other = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
-			await TestData.AddSavedScenarioAsync(other, 1, "Elsewhere");
+			await TestData.AddSavedScenarioAsync(other, "Elsewhere");
 
 			var result = await CreateService().ListSavedScenariosAsync(project.Id);
 
@@ -361,7 +336,6 @@ namespace ProjectOptimizerTests.Unit.Service
 			Assert.Equal(before.SnapshotJson, after.SnapshotJson);
 			Assert.Equal(before.ScenarioKey, after.ScenarioKey);
 			Assert.Equal(before.ScenarioIndex, after.ScenarioIndex);
-			Assert.Equal(before.RevisionNumber, after.RevisionNumber);
 			Assert.Equal(before.TotalCost, after.TotalCost);
 			Assert.Equal(before.TotalDuration, after.TotalDuration);
 			Assert.Equal(before.CreatedAt, after.CreatedAt);
@@ -416,7 +390,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var owner = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
 			var other = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
-			var saved = await TestData.AddSavedScenarioAsync(owner, 1, "Owned");
+			var saved = await TestData.AddSavedScenarioAsync(owner, "Owned");
 
 			await Assert.ThrowsAsync<NotFoundException>(() =>
 				CreateService().UpdateSavedScenarioAsync(other.Id, saved.Id, UpdateRequest("Hijacked")));
@@ -460,7 +434,7 @@ namespace ProjectOptimizerTests.Unit.Service
 		{
 			var owner = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
 			var other = await TestData.AddProjectAsync(bpmnXml: ChoiceOfAAndB);
-			var saved = await TestData.AddSavedScenarioAsync(owner, 1, "Owned");
+			var saved = await TestData.AddSavedScenarioAsync(owner, "Owned");
 
 			await Assert.ThrowsAsync<NotFoundException>(() => CreateService().DeleteSavedScenarioAsync(other.Id, saved.Id));
 
