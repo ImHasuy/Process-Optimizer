@@ -1,0 +1,85 @@
+@ProjectOptimizerAPI_HostAddress = http://localhost:5212
+@projectId = 00000000-0000-0000-0000-000000000000
+
+# Typical flow: create a project, copy its id into @projectId, save the frontend's JSON export
+# (it overwrites the project's diagram), then read its scenarios and resource limits.
+
+### Create project (starts with the default diagram)
+POST {{ProjectOptimizerAPI_HostAddress}}/api/projects
+Content-Type: application/json
+
+{
+  "name": "Office move",
+  "description": "Moving to the new office.",
+  "timeUnit": "Days",
+  "currency": "EUR"
+}
+
+### List projects
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects
+
+### Get project
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}
+
+### Update project
+PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}
+Content-Type: application/json
+
+{
+  "name": "Office move 2.0",
+  "description": "Renamed.",
+  "timeUnit": "Days",
+  "currency": "EUR"
+}
+
+### Save the frontend's JSON export (overwrites the diagram)
+PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/json
+Content-Type: application/json
+
+{
+  "states": [
+    { "id": "Start", "name": "Start", "type": "bpmn:StartEvent", "time": "", "price": "", "Depends_on": [], "Connects_to": ["Split"] },
+    { "id": "Split", "name": "Mover?", "type": "bpmn:ExclusiveGateway", "time": "", "price": "", "Depends_on": ["Start"], "Connects_to": ["Cheap", "Fast"] },
+    { "id": "Cheap", "name": "Cheap mover", "type": "bpmn:Task", "time": "2d", "price": "100 EUR", "Depends_on": ["Split"], "Connects_to": ["Join"] },
+    { "id": "Fast", "name": "Fast mover", "type": "bpmn:Task", "time": "1d", "price": "300 EUR", "Depends_on": ["Split"], "Connects_to": ["Join"] },
+    { "id": "Join", "name": "", "type": "bpmn:ExclusiveGateway", "time": "", "price": "", "Depends_on": ["Cheap", "Fast"], "Connects_to": ["End"] },
+    { "id": "End", "name": "Done", "type": "bpmn:EndEvent", "time": "", "price": "", "Depends_on": ["Join"], "Connects_to": [] }
+  ],
+  "branches": [
+    { "id": "F1", "name": "", "source": "Start", "target": "Split", "type": "sequence", "condition": null },
+    { "id": "F2", "name": "", "source": "Split", "target": "Cheap", "type": "nor", "condition": null },
+    { "id": "F3", "name": "", "source": "Split", "target": "Fast", "type": "xor", "condition": "deadline < 2d" },
+    { "id": "F4", "name": "", "source": "Cheap", "target": "Join", "type": "sequence", "condition": null },
+    { "id": "F5", "name": "", "source": "Fast", "target": "Join", "type": "sequence", "condition": null },
+    { "id": "F6", "name": "", "source": "Join", "target": "End", "type": "sequence", "condition": null }
+  ]
+}
+
+### Get diagram
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram
+
+### Download the diagram as a .bpmn file
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram/file
+
+### Scenario count
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenario-count
+
+### Get all scenarios
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios
+
+### Get one scenario by index (0 … count-1)
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/scenarios/1
+
+### Resource limits
+GET {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/resource-limits?basis=Planned
+
+### Overwrite the diagram with a BPMN XML instead
+PUT {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}/diagram
+Content-Type: application/json
+
+{
+  "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" id=\"D\"><bpmn:process id=\"P\"><bpmn:startEvent id=\"S\" /><bpmn:task id=\"T\" name=\"Work\" xmlns:po=\"http://projectoptimizer.app/schema/bpmn/1.0\" po:duration=\"3\" po:cost=\"100\" /><bpmn:endEvent id=\"E\" /><bpmn:sequenceFlow id=\"F1\" sourceRef=\"S\" targetRef=\"T\" /><bpmn:sequenceFlow id=\"F2\" sourceRef=\"T\" targetRef=\"E\" /></bpmn:process></bpmn:definitions>"
+}
+
+### Delete project
+DELETE {{ProjectOptimizerAPI_HostAddress}}/api/projects/{{projectId}}

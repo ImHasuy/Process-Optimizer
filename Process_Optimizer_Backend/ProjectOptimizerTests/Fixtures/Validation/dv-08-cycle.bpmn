@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:po="http://projectoptimizer.app/schema/bpmn/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:startEvent id="Start" />
+    <bpmn:exclusiveGateway id="Merge" />
+    <bpmn:task id="A" name="Work" po:duration="1" po:cost="1" />
+    <bpmn:exclusiveGateway id="Retry" />
+    <bpmn:endEvent id="End" />
+    <bpmn:sequenceFlow id="F1" sourceRef="Start" targetRef="Merge" />
+    <bpmn:sequenceFlow id="F2" sourceRef="Merge" targetRef="A" />
+    <bpmn:sequenceFlow id="F3" sourceRef="A" targetRef="Retry" />
+    <bpmn:sequenceFlow id="F4" sourceRef="Retry" targetRef="Merge" />
+    <bpmn:sequenceFlow id="F5" sourceRef="Retry" targetRef="End" />
+  </bpmn:process>
+</bpmn:definitions>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:po="http://projectoptimizer.app/schema/bpmn/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:startEvent id="Start" />
+    <bpmn:task id="A" name="A" po:duration="1" po:cost="1" />
+    <bpmn:task id="B" name="B" po:duration="1" po:cost="1" />
+    <bpmn:task id="C" name="C" po:duration="1" po:cost="1" />
+    <bpmn:task id="D" name="D" po:duration="1" po:cost="1" />
+    <bpmn:endEvent id="End" />
+    <bpmn:sequenceFlow id="F1" sourceRef="Start" targetRef="A" />
+    <bpmn:sequenceFlow id="F2" sourceRef="A" targetRef="B" />
+    <bpmn:sequenceFlow id="F3" sourceRef="A" targetRef="C" />
+    <bpmn:sequenceFlow id="F4" sourceRef="B" targetRef="D" />
+    <bpmn:sequenceFlow id="F5" sourceRef="C" targetRef="D" />
+    <bpmn:sequenceFlow id="F6" sourceRef="D" targetRef="End" />
+  </bpmn:process>
+</bpmn:definitions>

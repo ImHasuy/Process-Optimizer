@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:po="http://projectoptimizer.app/schema/bpmn/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:startEvent id="Start" />
+    <bpmn:inclusiveGateway id="Split" />
+    <bpmn:inclusiveGateway id="Join" />
+    <bpmn:endEvent id="End" />
+    <bpmn:sequenceFlow id="FIn" sourceRef="Start" targetRef="Split" />
+    <bpmn:sequenceFlow id="FOut" sourceRef="Join" targetRef="End" />
+    <bpmn:task id="T01" name="T01" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS01" sourceRef="Split" targetRef="T01" />
+    <bpmn:sequenceFlow id="FJ01" sourceRef="T01" targetRef="Join" />
+    <bpmn:task id="T02" name="T02" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS02" sourceRef="Split" targetRef="T02" />
+    <bpmn:sequenceFlow id="FJ02" sourceRef="T02" targetRef="Join" />
+    <bpmn:task id="T03" name="T03" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS03" sourceRef="Split" targetRef="T03" />
+    <bpmn:sequenceFlow id="FJ03" sourceRef="T03" targetRef="Join" />
+    <bpmn:task id="T04" name="T04" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS04" sourceRef="Split" targetRef="T04" />
+    <bpmn:sequenceFlow id="FJ04" sourceRef="T04" targetRef="Join" />
+    <bpmn:task id="T05" name="T05" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS05" sourceRef="Split" targetRef="T05" />
+    <bpmn:sequenceFlow id="FJ05" sourceRef="T05" targetRef="Join" />
+    <bpmn:task id="T06" name="T06" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS06" sourceRef="Split" targetRef="T06" />
+    <bpmn:sequenceFlow id="FJ06" sourceRef="T06" targetRef="Join" />
+    <bpmn:task id="T07" name="T07" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS07" sourceRef="Split" targetRef="T07" />
+    <bpmn:sequenceFlow id="FJ07" sourceRef="T07" targetRef="Join" />
+    <bpmn:task id="T08" name="T08" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS08" sourceRef="Split" targetRef="T08" />
+    <bpmn:sequenceFlow id="FJ08" sourceRef="T08" targetRef="Join" />
+    <bpmn:task id="T09" name="T09" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS09" sourceRef="Split" targetRef="T09" />
+    <bpmn:sequenceFlow id="FJ09" sourceRef="T09" targetRef="Join" />
+    <bpmn:task id="T10" name="T10" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS10" sourceRef="Split" targetRef="T10" />
+    <bpmn:sequenceFlow id="FJ10" sourceRef="T10" targetRef="Join" />
+    <bpmn:task id="T11" name="T11" po:duration="1" po:cost="1" />
+    <bpmn:sequenceFlow id="FS11" sourceRef="Split" targetRef="T11" />
+    <bpmn:sequenceFlow id="FJ11" sourceRef="T11" targetRef="Join" />
+  </bpmn:process>
+</bpmn:definitions>
